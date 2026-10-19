@@ -3,7 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>body{margin:0}img{max-width:100%}</style>
+<style>body{margin:0}img{max-width:100%}/* start-up pop-up: automatic or manual */
+.sp,.sp *{box-sizing:border-box}
+.sp{position:fixed;inset:0;z-index:70;background:rgba(17,13,12,.55);display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
+.sp-card{width:100%;max-width:520px;background:var(--wb-panel);color:var(--wb-fg);border:1px solid var(--wb-line);border-radius:16px;padding:22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.sp-card h2{margin:0;font-family:var(--wb-display);font-size:24px;line-height:1.15}
+.sp-kick{margin:0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--wb-accent)}
+.sp-opt{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;width:100%;padding:16px 18px;border-radius:12px;border:2px solid var(--wb-accent);background:var(--wb-accent);color:var(--wb-accent-fg);cursor:pointer;overflow:hidden}
+.sp-opt b{font-size:19px;font-weight:800}
+.sp-opt small{font-size:14px;opacity:.9;line-height:1.35}
+.sp-opt.alt{background:transparent;color:var(--wb-fg)}
+.sp-opt.alt b{color:var(--wb-accent)}
+.sp-opt:focus-within,.sp-opt:focus-visible{outline:3px solid var(--wb-fg);outline-offset:3px}
+.sp-msg{margin:0;font-size:15px;line-height:1.5;color:var(--wb-dim)}
+.sp-msg b{color:var(--wb-fg)}
+.sp-msg.err{color:var(--wb-accent)}
+.sp-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sp-list button{width:100%;text-align:left;font:inherit;font-size:14px;padding:10px 12px;border-radius:8px;border:1px solid var(--wb-line);background:var(--wb-bg);color:var(--wb-fg);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.sp-list button small{color:var(--wb-dim)}
+.sp-list button.best{border-color:var(--wb-accent)}
+.sp-help{font-size:14px;color:var(--wb-dim);line-height:1.5}
+.sp-help summary{cursor:pointer;color:var(--wb-fg);font-weight:700}
+.sp-help ol{margin:6px 0 0;padding-left:20px}
+.sp-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sp-row input{flex:1;min-width:0;font:inherit;font-size:14px;color:var(--wb-fg);background:var(--wb-bg);border:1px solid var(--wb-line);border-radius:6px;padding:8px 10px}
+.sp-x{align-self:center;font:inherit;background:none;border:0;color:var(--wb-dim);text-decoration:underline;cursor:pointer;font-size:14px}
+</style>
 <!-- Install as an app on phones (PWA) -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -3256,16 +3281,181 @@ async function takeSharedFile(){
     return new File([b], name, {type: b.type});
   } catch (e) { return null; }
 }
-$('bAuto').onclick = function(){ autoPickScreen(); };
+/* =================== Start-up pop-up: find this Sunday's Tata Ibadah automatically, or choose it by hand ===================
+   Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
+   the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
+   A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
+var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
+var IS_ANDROID = /Android/i.test(navigator.userAgent);
+var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+var MONTHS_ID = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'];
+var MONTHS_EN = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+function nextSunday(from){ var d = new Date(from || Date.now()); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + (7 - d.getDay()) % 7); return d; }
+function sundayLabel(d){ return 'Minggu, ' + d.getDate() + ' ' + MONTHS_ID[d.getMonth()].replace(/^./, function(c){ return c.toUpperCase(); }) + ' ' + d.getFullYear(); }
+function lsGet(k){ try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function lsSet(k, v){ try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) {} }
+function ssGet(k){ try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }
+function ssSet(k, v){ try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch (e) {} }
+function gClientId(){ return (lsGet('ti-gdrive-client') || GDRIVE_CLIENT_ID || '').trim(); }
+function gRedirect(){ return location.origin + location.pathname; }
+function gToken(){ var t = ssGet('ti-gdrive-token'), x = +ssGet('ti-gdrive-exp') || 0; return t && x > Date.now() + 60000 ? t : ''; }
+
+/* how well a file name matches the coming Sunday: date in the name scores high, "tata ibadah" a little */
+function sundayScore(name, sun){
+  var n = name.toLowerCase().replace(/[_]+/g, ' '), d = sun.getDate(), m = sun.getMonth() + 1, y = sun.getFullYear(), s = 0;
+  var dd = String(d).padStart(2, '0'), mm = String(m).padStart(2, '0'), yy = String(y).slice(2);
+  var dayRe = new RegExp('(^|\\D)0?' + d + '(\\D|$)');
+  var monthWord = new RegExp(MONTHS_ID[m - 1].slice(0, 3) + '|' + MONTHS_EN[m - 1].slice(0, 3));
+  if (dayRe.test(n) && monthWord.test(n)) s += 10;
+  [dd + mm + y, dd + mm + yy, y + mm + dd, yy + mm + dd].forEach(function(p){ if (n.indexOf(p) >= 0) s += 10; });
+  if (new RegExp('(^|\\D)0?' + d + '[-./ ]0?' + m + '([-./ ](' + y + '|' + yy + '))?(\\D|$)').test(n)) s += 10;
+  if (/tata\s*-?\s*ibadah|acara\s*ibadah|liturgi|kebaktian|minggu/.test(n)) s += 3;
+  return s;
+}
+
+function spClose(){ var o = document.getElementById('startPop'); if (o) o.remove(); }
+function spCard(html){
+  var o = document.getElementById('startPop');
+  if (!o) { o = document.createElement('div'); o.id = 'startPop'; o.className = 'sp'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'spTitle'); document.body.appendChild(o); }
+  o.innerHTML = '<div class="sp-card">' + html + '</div>';
+  return o;
+}
+function spManualBtn(label){
+  return '<label class="sp-opt alt"><b>' + (label || 'Choose the Tata Ibadah') + '</b><small>Pick the .pdf, .docx or .doc yourself: from this phone, WhatsApp downloads, iCloud Drive, Google Drive, OneDrive or Dropbox.</small><input type="file" id="spFile" class="pickfile" accept=".pdf,.docx,.doc,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/html" aria-label="Choose the Tata Ibadah"></label>';
+}
+function spWireManual(){
+  var f = document.getElementById('spFile');
+  if (f) f.onchange = function(){ var file = this.files && this.files[0]; if (file) { spClose(); autoRun(file); } };
+  var full = document.getElementById('spFull'); if (full) full.onclick = spClose;
+  var back = document.getElementById('spBack'); if (back) back.onclick = startPopup;
+}
+
+/* the pop-up itself */
+function startPopup(){
+  var sun = nextSunday();
+  spCard(
+    '<p class="sp-kick">Tata Ibadah autopilot</p><h2 id="spTitle">Slides for ' + escH(sundayLabel(sun)) + '</h2>' +
+    '<p class="sp-msg">How do you want to get this Sunday’s Tata Ibadah?</p>' +
+    '<button class="sp-opt" id="spAuto"><b>Find it automatically</b><small>' + escH(autoWhere()) + '</small></button>' +
+    spManualBtn() +
+    '<button class="sp-x" id="spFull">Open the full workbench instead</button>');
+  document.getElementById('spAuto').onclick = autoFind;
+  spWireManual();
+}
+function autoWhere(){
+  if (FS_OK) return 'Looks in your Tata Ibadah folder and in Google Drive for the newest file for this Sunday.';
+  if (IS_ANDROID) return 'Takes a file you shared from WhatsApp to the Tata Ibadah app, or finds this Sunday’s file in Google Drive.';
+  return 'Finds this Sunday’s file in Google Drive, including files you saved there from WhatsApp.';
+}
+
+async function autoFind(){
+  var sun = nextSunday();
+  // 1. a file shared into the app (Android share sheet)
+  var shared = await takeSharedFile();
+  if (shared) { spClose(); return autoRun(shared); }
+  // 2. the watched folder on a computer
+  if (FS_OK && await watchLoad()) { spClose(); return autoPickScreen('Folder autopilot'); }
+  // 3. Google Drive
+  if (!gClientId()) return driveSetup();
+  if (!gToken()) return driveConnect();
+  spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Looking in Google Drive…</h2><p class="sp-msg" id="spMsg">Searching for the Tata Ibadah for ' + escH(sundayLabel(sun)) + '.</p>');
+  try {
+    var since = new Date(Date.now() - 10 * 864e5).toISOString();
+    var types = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.google-apps.document'];
+    var q = "trashed=false and modifiedTime > '" + since + "' and (" + types.map(function(t){ return "mimeType='" + t + "'"; }).join(' or ') + ')';
+    var r = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=100&orderBy=modifiedTime%20desc&fields=files(id,name,mimeType,modifiedTime)&q=' + encodeURIComponent(q), {headers: {Authorization: 'Bearer ' + gToken()}});
+    if (r.status === 401) { ssSet('ti-gdrive-token', ''); return driveConnect(); }
+    if (!r.ok) throw new Error('Google Drive answered ' + r.status);
+    var files = ((await r.json()).files || []).map(function(f){ f.score = sundayScore(f.name, sun); return f; });
+    files.sort(function(a, b){ return (b.score - a.score) || (Date.parse(b.modifiedTime) - Date.parse(a.modifiedTime)); });
+    var good = files.filter(function(f){ return f.score >= 10; });
+    if (good.length === 1 || (good.length > 1 && good[0].score > good[1].score)) return driveRun(good[0]);
+    driveChoose(good.length ? good : files.slice(0, 8), sun);
+  } catch (err) {
+    spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Google Drive didn’t work</h2><p class="sp-msg err">' + escH(err.message || 'Unknown error') + '</p>' +
+      '<button class="sp-opt" id="spAgain"><b>Try again</b></button>' + spManualBtn() + '<button class="sp-x" id="spBack">Back</button>');
+    document.getElementById('spAgain').onclick = autoFind; spWireManual();
+  }
+}
+function driveChoose(files, sun){
+  var none = !files.length;
+  spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">' + (none ? 'Nothing new in Google Drive' : 'Which one is it?') + '</h2>' +
+    '<p class="sp-msg">' + (none ? 'No .pdf, .docx or .doc was added to your Google Drive in the last 10 days. Save the Tata Ibadah from WhatsApp to Google Drive (open it → Share → Save to Files → Google Drive), then try again.'
+      : 'No file name clearly matches ' + escH(sundayLabel(sun)) + '. Recent files in your Google Drive:') + '</p>' +
+    (none ? '' : '<ul class="sp-list">' + files.map(function(f, i){ return '<li><button data-i="' + i + '"' + (i === 0 ? ' class="best"' : '') + '>' + escH(f.name) + '<small>Changed ' + escH(new Date(f.modifiedTime).toLocaleString()) + '</small></button></li>'; }).join('') + '</ul>') +
+    (none ? '<button class="sp-opt" id="spAgain"><b>Look again</b></button>' : '') + spManualBtn() + '<button class="sp-x" id="spBack">Back</button>');
+  document.querySelectorAll('#startPop .sp-list button').forEach(function(b){ b.onclick = function(){ driveRun(files[+b.dataset.i]); }; });
+  var again = document.getElementById('spAgain'); if (again) again.onclick = autoFind;
+  spWireManual();
+}
+async function driveRun(f){
+  spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Found it</h2><p class="sp-msg"><b>' + escH(f.name) + '</b><br>Downloading from Google Drive…</p>');
+  try {
+    var isGdoc = f.mimeType === 'application/vnd.google-apps.document', docx = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(f.id) + (isGdoc ? '/export?mimeType=' + encodeURIComponent(docx) : '?alt=media');
+    var r = await fetch(url, {headers: {Authorization: 'Bearer ' + gToken()}});
+    if (r.status === 401) { ssSet('ti-gdrive-token', ''); return driveConnect(); }
+    if (!r.ok) throw new Error('Google Drive answered ' + r.status);
+    var b = await r.blob(), name = isGdoc ? f.name + '.docx' : f.name;
+    spClose(); autoRun(new File([b], name, {type: isGdoc ? docx : (f.mimeType || b.type)}));
+  } catch (err) {
+    spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Couldn’t download it</h2><p class="sp-msg err">' + escH(err.message || 'Unknown error') + '</p>' + spManualBtn() + '<button class="sp-x" id="spBack">Back</button>');
+    spWireManual();
+  }
+}
+/* sign in to Google: the page goes to Google and comes back here with a short-lived read-only key */
+function driveConnect(){
+  spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Connect Google Drive</h2>' +
+    '<p class="sp-msg">To find the Tata Ibadah by itself, the app needs to look in your Google Drive (read only). Google will ask you to sign in and allow it.</p>' +
+    '<button class="sp-opt" id="spGo"><b>Connect Google Drive</b><small>You come back here afterwards and the search starts.</small></button>' +
+    (IS_ANDROID ? '<p class="sp-msg">Got it on WhatsApp? Faster: in WhatsApp open the file → Share → <b>Tata Ibadah</b>.</p>' : '') +
+    spManualBtn() + '<button class="sp-x" id="spBack">Back</button>');
+  spWireManual();
+  document.getElementById('spGo').onclick = function(){
+    var st = Math.random().toString(36).slice(2) + Date.now().toString(36); ssSet('ti-gdrive-state', st);
+    location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({client_id: gClientId(), redirect_uri: gRedirect(), response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.readonly', include_granted_scopes: 'true', state: st}).toString();
+  };
+}
+/* Google Drive needs a client ID once; shown only while none is set */
+function driveSetup(){
+  spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Google Drive isn’t set up yet</h2>' +
+    '<p class="sp-msg">' + (IS_ANDROID ? 'No file was shared to the app. In WhatsApp open the Tata Ibadah → Share → <b>Tata Ibadah</b> and it opens here by itself. ' : '') +
+      'To also find files in Google Drive, the app needs a Google client ID once.</p>' +
+    '<details class="sp-help"><summary>Set up Google Drive</summary><ol>' +
+      '<li>Open <b>console.cloud.google.com</b>, create a project and enable the <b>Google Drive API</b>.</li>' +
+      '<li>OAuth consent screen: External, add yourself as a test user.</li>' +
+      '<li>Credentials → Create → <b>OAuth client ID</b> → Web application. Authorised JavaScript origin: <b>' + escH(location.origin) + '</b>. Redirect URI: <b>' + escH(gRedirect()) + '</b>.</li>' +
+      '<li>Paste the client ID here:</li></ol>' +
+      '<div class="sp-row"><input type="text" id="spCid" placeholder="…apps.googleusercontent.com" autocomplete="off"><button class="btn small primary" id="spCidSave">Save</button></div></details>' +
+    spManualBtn() + '<button class="sp-x" id="spBack">Back</button>');
+  spWireManual();
+  document.getElementById('spCidSave').onclick = function(){
+    var v = document.getElementById('spCid').value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(v)) { toast('That doesn’t look like a Google client ID (it ends in .apps.googleusercontent.com).'); return; }
+    lsSet('ti-gdrive-client', v); driveConnect();
+  };
+}
+/* back from Google sign-in: keep the key for this visit only, then search straight away */
+function driveReturn(){
+  if (!/access_token=|error=/.test(location.hash)) return false;
+  var h = new URLSearchParams(location.hash.slice(1));
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
+  if (h.get('state') !== ssGet('ti-gdrive-state')) { toast('Google sign-in could not be checked. Try again.'); return false; }
+  ssSet('ti-gdrive-state', '');
+  if (h.get('access_token')) { ssSet('ti-gdrive-token', h.get('access_token')); ssSet('ti-gdrive-exp', String(Date.now() + (+h.get('expires_in') || 3600) * 1000)); }
+  else toast('Google Drive was not connected.');
+  return true;
+}
+$('bAuto').onclick = function(){ startPopup(); };
 if (AUTO) setTimeout(autoRun, 50);
+else if (driveReturn()) setTimeout(autoFind, 50);
 else if (/[?&](app|autopilot|shared)=1\b/.test(location.search)) setTimeout(async function(){
   var f = /[?&]shared=1\b/.test(location.search) ? await takeSharedFile() : null;
   try { history.replaceState(null, '', location.pathname + '?app=1' + (HUB_KEY ? '&k=' + HUB_KEY : '')); } catch (e) {}
-  if (f) autoRun(f); else autoPickScreen();
+  if (f) autoRun(f); else startPopup();
 }, 50);
-/* on a phone the link opens straight into the autopilot; "Open the full workbench instead" is one tap away */
-else if (IS_TOUCH && matchMedia('(max-width: 820px)').matches && !/[?&]full=1\b/.test(location.search)) setTimeout(function(){ autoPickScreen('Autopilot on this phone'); }, 50);
-else if (FS_OK && !/[?&]full=1\b/.test(location.search)) watchLoad().then(function(have){ if (have) autoPickScreen('Folder autopilot'); });
+/* every start opens the pop-up: find this Sunday's Tata Ibadah automatically, or choose it by hand ("?full=1" skips it) */
+else if (!/[?&]full=1\b/.test(location.search)) setTimeout(startPopup, 50);
 
 </script>
 
