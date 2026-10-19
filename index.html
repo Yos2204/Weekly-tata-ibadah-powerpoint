@@ -30,6 +30,7 @@
 .sp-close{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--wb-line);background:var(--wb-bg);color:var(--wb-fg);font:inherit;font-size:26px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0 0 3px;z-index:2}
 .sp-close:hover{border-color:var(--wb-dim)}
 .sp-card .sp-kick{padding-right:48px}
+.sp-ver{margin:-6px 0 0;text-align:center;font-size:12px;color:var(--wb-dim)}
 .sp-x{align-self:center;font:inherit;background:none;border:0;color:var(--wb-dim);text-decoration:underline;cursor:pointer;font-size:14px}
 </style>
 <!-- Install as an app on phones (PWA) -->
@@ -3288,6 +3289,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
+var APP_VERSION = '2026-10-19 · 3';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
@@ -3347,7 +3349,7 @@ function startPopup(){
     '<p class="sp-msg">How do you want to get this Sunday’s Tata Ibadah?</p>' +
     '<button class="sp-opt" id="spAuto"><b>Find it automatically</b><small>' + escH(autoWhere()) + '</small></button>' +
     spManualBtn() +
-    '<button class="sp-x" id="spFull">Open the full workbench instead</button>');
+    '<button class="sp-x" id="spFull">Open the full workbench instead</button><p class="sp-ver">Version ' + APP_VERSION + '</p>');
   document.getElementById('spAuto').onclick = autoFind;
   spWireManual();
 }
@@ -3469,8 +3471,13 @@ else if (!/[?&]full=1\b/.test(location.search)) setTimeout(startPopup, 50);
 </script>
 
 <script>
-// Offline support for the installed app.
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function(){});
+// Offline support for the installed app. Checks for a new version every time it opens and reloads once to show it.
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  var hadSw = !!navigator.serviceWorker.controller, swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){ if (hadSw && !swReloaded) { swReloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(function(r){ r.update().catch(function(){}); }).catch(function(){});
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') navigator.serviceWorker.getRegistration().then(function(r){ if (r) r.update().catch(function(){}); }); });
+}
 </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-// Offline support: always try the network first, fall back to the cached copy when offline.
+// Offline support: always try the network first (bypassing stale browser caches), fall back to the cached copy when offline.
 // Also receives files shared to the installed app (Android: WhatsApp → Share → Tata Ibadah).
-const CACHE = "tata-ibadah-v2";
+const CACHE = "tata-ibadah-v3";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const CDN = ["cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -23,5 +23,7 @@ self.addEventListener("fetch", (e) => {
   }
   if (e.request.method !== "GET") return;
   if (url.origin !== self.location.origin && !CDN.includes(url.hostname)) return;
-  e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request)));
+  // own files: always ask the server for the newest copy (no stale browser cache)
+  const req = url.origin === self.location.origin ? new Request(e.request, { cache: "no-cache" }) : e.request;
+  e.respondWith(fetch(req).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return r; }).catch(() => caches.match(e.request)));
 });
