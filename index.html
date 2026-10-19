@@ -6,7 +6,7 @@
 <style>body{margin:0}img{max-width:100%}/* start-up pop-up: automatic or manual */
 .sp,.sp *{box-sizing:border-box}
 .sp{position:fixed;inset:0;z-index:70;background:rgba(17,13,12,.55);display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
-.sp-card{width:100%;max-width:520px;background:var(--wb-panel);color:var(--wb-fg);border:1px solid var(--wb-line);border-radius:16px;padding:22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.sp-card{position:relative;width:100%;max-width:520px;background:var(--wb-panel);color:var(--wb-fg);border:1px solid var(--wb-line);border-radius:16px;padding:22px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
 .sp-card h2{margin:0;font-family:var(--wb-display);font-size:24px;line-height:1.15}
 .sp-kick{margin:0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--wb-accent)}
 .sp-opt{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;width:100%;padding:16px 18px;border-radius:12px;border:2px solid var(--wb-accent);background:var(--wb-accent);color:var(--wb-accent-fg);cursor:pointer;overflow:hidden}
@@ -27,6 +27,9 @@
 .sp-help ol{margin:6px 0 0;padding-left:20px}
 .sp-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .sp-row input{flex:1;min-width:0;font:inherit;font-size:14px;color:var(--wb-fg);background:var(--wb-bg);border:1px solid var(--wb-line);border-radius:6px;padding:8px 10px}
+.sp-close{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--wb-line);background:var(--wb-bg);color:var(--wb-fg);font:inherit;font-size:26px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0 0 3px;z-index:2}
+.sp-close:hover{border-color:var(--wb-dim)}
+.sp-card .sp-kick{padding-right:48px}
 .sp-x{align-self:center;font:inherit;background:none;border:0;color:var(--wb-dim);text-decoration:underline;cursor:pointer;font-size:14px}
 </style>
 <!-- Install as an app on phones (PWA) -->
@@ -3314,10 +3317,16 @@ function sundayScore(name, sun){
 }
 
 function spClose(){ var o = document.getElementById('startPop'); if (o) o.remove(); }
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && document.getElementById('startPop')) spClose(); });
 function spCard(html){
   var o = document.getElementById('startPop');
-  if (!o) { o = document.createElement('div'); o.id = 'startPop'; o.className = 'sp'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'spTitle'); document.body.appendChild(o); }
-  o.innerHTML = '<div class="sp-card">' + html + '</div>';
+  if (!o) {
+    o = document.createElement('div'); o.id = 'startPop'; o.className = 'sp'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'spTitle'); document.body.appendChild(o);
+    // tap outside the window closes it
+    o.addEventListener('click', function(e){ if (e.target === o) spClose(); });
+  }
+  o.innerHTML = '<div class="sp-card"><button class="sp-close" id="spClose" aria-label="Close">×</button>' + html + '</div>';
+  document.getElementById('spClose').onclick = spClose;
   return o;
 }
 function spManualBtn(label){
