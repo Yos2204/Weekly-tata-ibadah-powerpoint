@@ -1105,15 +1105,69 @@ function paraInfo(p){
   return {t: t.replace(/[  ]+/g, ' ').trim(), numbered: numbered, bold: bold};
 }
 function cellParas(tc){
-  var out = [];
+  var out = [], gap = false;   // gap: a blank line or empty paragraph came before this line (a new stanza)
   var ps = tc.getElementsByTagName('w:p');
   for (var i = 0; i < ps.length; i++) {
     var info = paraInfo(ps[i]);
+    if (!info.t.trim()) { if (out.length) gap = true; continue; }
     info.t.split('\n').forEach(function(line, j){
-      line = line.trim(); if (line) out.push({t: line, numbered: info.numbered && j === 0, bold: info.bold});
+      line = line.trim();
+      if (!line) { if (out.length) gap = true; return; }
+      var o = {t: line, numbered: info.numbered && j === 0, bold: info.bold};
+      if (gap) { o.gap = true; gap = false; }
+      out.push(o);
     });
   }
   return out;
+}
+/* a song that arrives as one long block (no verse numbers, only line breaks) is split into slides:
+   at blank lines, at ♪♪ music breaks, at Reff / Refrain, at -Musik- style cues, and long parts into
+   pieces of at most 6 lines. Each slide keeps the verse number it came from. */
+var MARK_MUSIC = /^[♪♫♩\s]+$/, MARK_REF = /^\[?\s*(?:reff?|refrain|koor|chorus)\b\s*\.?\s*\]?\s*:?\s*/i;
+/* long part of a song: break after lines that end a sentence (. ! ?), about 4 lines per slide, never more than 6 */
+function chunkLines(lines){
+  if (lines.length <= 6) return [lines];
+  var groups = [], g = [];
+  lines.forEach(function(t){ g.push(t); if (/[.!?]["”’»)]*$/.test(t) && !/\.\.\.$|…$/.test(t)) { groups.push(g); g = []; } });
+  if (g.length) groups.push(g);
+  var even = function(ls){ var k = Math.ceil(ls.length / 6), per = Math.ceil(ls.length / k), r = []; for (var i = 0; i < ls.length; i += per) r.push(ls.slice(i, i + per)); return r; };
+  if (groups.length < 2) return even(lines);
+  var out = [], cur = [];
+  groups.forEach(function(gr){
+    if (cur.length && (cur.length >= 4 || cur.length + gr.length > 6)) { out.push(cur); cur = []; }
+    cur = cur.concat(gr);
+  });
+  if (cur.length) { if (cur.length < 2 && out.length && out[out.length - 1].length + cur.length <= 6) out[out.length - 1] = out[out.length - 1].concat(cur); else out.push(cur); }
+  return [].concat.apply([], out.map(function(c){ return c.length > 6 ? even(c) : [c]; }));
+}
+function splitLumped(verses){
+  var out = [], count = 0;
+  verses.forEach(function(v){
+    var marked = v.lines.some(function(l){ return l.gap || l.cue || MARK_MUSIC.test(l.t) || MARK_REF.test(l.t); });
+    if (!((v.lines.length > 8 && marked) || v.lines.length > 12)) {
+      v.lines = v.lines.map(function(l){ return l.ref ? {t: l.t, ref: true} : {t: l.t}; }); out.push(v); return;
+    }
+    var parts = [], cur = {cue: v.cue, cueText: v.cueText, ref: false, lines: []};
+    var next = function(cue, cueText, ref){ if (cur.lines.length) parts.push(cur); cur = {cue: cue || null, cueText: cueText || '', ref: !!ref, lines: []}; };
+    v.lines.forEach(function(l){
+      var t = l.t, rm;
+      if (MARK_MUSIC.test(t)) { next('music', 'Musik'); return; }
+      if ((rm = MARK_REF.exec(t))) { next(cur.lines.length ? null : cur.cue, cur.lines.length ? '' : cur.cueText, true); t = t.slice(rm[0].length).trim(); if (!t) return; }
+      else if (l.gap || l.cue) {
+        if (cur.lines.length) next();
+        if (l.cue && !cur.cue) { cur.cue = l.cue.type; cur.cueText = l.cue.text; }
+      }
+      cur.lines.push(t);
+    });
+    if (cur.lines.length) parts.push(cur);
+    parts.forEach(function(pt){
+      chunkLines(pt.lines).forEach(function(ls, i){
+        out.push({n: v.n, cue: i ? null : pt.cue, cueText: i ? '' : pt.cueText, lines: ls.map(function(t){ return pt.ref ? {t: t, ref: true} : {t: t}; })});
+      });
+    });
+    count++;
+  });
+  return {verses: out, split: count};
 }
 function verseSpec(ref){
   var m = /:\s*([\d\s,–—\-]+)\s*$/.exec(ref || ''); if (!m) return null;
@@ -1276,14 +1330,14 @@ function buildService(headers, rawRows, fileName, source){
       var off = /\(([^)]*(?:pelean|persembahan|offering|kolekte)[^)]*)\)/i.exec(sub) || (OFF.test(title) ? [0, title] : null);
       det = det.filter(function(p){ var x = /^\(?\s*((?:pelean|persembahan|offering|kolekte)[^)]*)\)?\s*$/i.exec(p.t); if (x) { off = off || [0, x[1]]; return false; } return true; });
       var verses = [], pending = null, anyNum = det.some(function(p){ return p.numbered || /^\d+[.)]\s+/.test(p.t); });
-      var plain = [];   // for files without list numbering (.doc): lines with cue markers
+      var plain = [], brk = null;   // plain: for files without list numbering (.doc): lines with cue markers
       det.forEach(function(p){
         var cue = cueOf(p.t);
-        if (cue) { pending = cue; plain.push({cue: cue}); return; }
+        if (cue) { pending = cue; plain.push({cue: cue}); if (verses.length) brk = cue; return; }
         plain.push({t: p.t});
         var m = /^(\d+)[.)]\s+(.*)$/.exec(p.t);
-        if (p.numbered || m || !verses.length) { verses.push({n: m ? +m[1] : null, cue: pending ? pending.type : null, cueText: pending ? pending.text : '', lines: [{t: m ? m[2] : p.t}]}); pending = null; }
-        else verses[verses.length - 1].lines.push({t: p.t});
+        if (p.numbered || m || !verses.length) { verses.push({n: m ? +m[1] : null, cue: pending ? pending.type : null, cueText: pending ? pending.text : '', lines: [{t: m ? m[2] : p.t}]}); pending = null; brk = null; }
+        else { var ln = {t: p.t}; if (p.gap) ln.gap = true; if (brk) { ln.cue = brk; pending = null; brk = null; } verses[verses.length - 1].lines.push(ln); }
       });
       var spec = verseSpec(ref);
       if (!anyNum && spec && spec.length > 1 && verses.length === 1) {
@@ -1303,6 +1357,8 @@ function buildService(headers, rawRows, fileName, source){
         if (v.n == null) v.n = spec && spec.length === verses.length ? spec[k] : (spec && spec.length === 1 ? spec[0] + k : k + 1);
       });
       if (anyNum && spec && spec.length !== verses.length) warnings.push(label + ' ' + ref + ': found ' + verses.length + ' verse(s), the reference lists ' + spec.length + '. Check the numbering.');
+      var lump = splitLumped(verses); verses = lump.verses;
+      if (lump.split) warnings.push(label + ' ' + ref + ': the song came as one long block, so it was split into ' + verses.length + ' slides at its music breaks, refrain and sentence ends. Check them in Edit slide.');
       if (verses.length > 1) {
         var key = function(t){ return t.toLowerCase().replace(/[.,]\s*$/, ''); };
         verses[0].lines.forEach(function(l){
@@ -3322,7 +3378,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-20 · 4';
+var APP_VERSION = '2026-10-20 · 5';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
