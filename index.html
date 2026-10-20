@@ -1120,15 +1120,15 @@ function cellParas(tc){
   }
   return out;
 }
-/* a song that arrives as one long block (no verse numbers, only line breaks) is split into slides:
-   at blank lines, at ♪♪ music breaks, at Reff / Refrain, at -Musik- style cues, and long parts into
-   pieces of at most 6 lines. Each slide keeps the verse number it came from. */
+/* a song that arrives lumped together (one verse of more than 8 lines, e.g. no verse numbers, only line breaks)
+   is split into slides: at ♪♪ music breaks, at Reff / Refrain, at blank lines and -Musik- style cues, then after
+   sentence-ending lines, about 4 lines per slide and never more than 6. Each slide keeps its verse number. */
 var MARK_MUSIC = /^[♪♫♩\s]+$/, MARK_REF = /^\[?\s*(?:reff?|refrain|koor|chorus)\b\s*\.?\s*\]?\s*:?\s*/i;
 /* long part of a song: break after lines that end a sentence (. ! ?), about 4 lines per slide, never more than 6 */
 function chunkLines(lines){
   if (lines.length <= 6) return [lines];
   var groups = [], g = [];
-  lines.forEach(function(t){ g.push(t); if (/[.!?]["”’»)]*$/.test(t) && !/\.\.\.$|…$/.test(t)) { groups.push(g); g = []; } });
+  lines.forEach(function(x){ var t = x.t; g.push(x); if (/[.!?]["”’»)]*$/.test(t) && !/\.\.\.$|…$/.test(t)) { groups.push(g); g = []; } });
   if (g.length) groups.push(g);
   var even = function(ls){ var k = Math.ceil(ls.length / 6), per = Math.ceil(ls.length / k), r = []; for (var i = 0; i < ls.length; i += per) r.push(ls.slice(i, i + per)); return r; };
   if (groups.length < 2) return even(lines);
@@ -1143,29 +1143,32 @@ function chunkLines(lines){
 function splitLumped(verses){
   var out = [], count = 0;
   verses.forEach(function(v){
-    var marked = v.lines.some(function(l){ return l.gap || l.cue || MARK_MUSIC.test(l.t) || MARK_REF.test(l.t); });
-    if (!((v.lines.length > 8 && marked) || v.lines.length > 12)) {
-      v.lines = v.lines.map(function(l){ return l.ref ? {t: l.t, ref: true} : {t: l.t}; }); out.push(v); return;
-    }
+    // a verse of more than 8 lines is a song that came lumped together; anything shorter stays exactly as it is
+    if (v.lines.length <= 8) { v.lines = v.lines.map(function(l){ return l.ref ? {t: l.t, ref: true} : {t: l.t}; }); out.push(v); return; }
+    // lumped verse: split at music breaks, Reff, blank lines and cues, then into pieces of about 4 lines
     var parts = [], cur = {cue: v.cue, cueText: v.cueText, ref: false, lines: []};
     var next = function(cue, cueText, ref){ if (cur.lines.length) parts.push(cur); cur = {cue: cue || null, cueText: cueText || '', ref: !!ref, lines: []}; };
     v.lines.forEach(function(l){
       var t = l.t, rm;
-      if (MARK_MUSIC.test(t)) { next('music', 'Musik'); return; }
+      if (MARK_MUSIC.test(t)) { next(cur.lines.length ? 'music' : (cur.cue || 'music'), cur.lines.length ? 'Musik' : (cur.cueText || 'Musik')); return; }
       if ((rm = MARK_REF.exec(t))) { next(cur.lines.length ? null : cur.cue, cur.lines.length ? '' : cur.cueText, true); t = t.slice(rm[0].length).trim(); if (!t) return; }
       else if (l.gap || l.cue) {
         if (cur.lines.length) next();
         if (l.cue && !cur.cue) { cur.cue = l.cue.type; cur.cueText = l.cue.text; }
       }
-      cur.lines.push(t);
+      cur.lines.push(l.ref ? {t: t, ref: true} : {t: t, ref: cur.ref});
     });
     if (cur.lines.length) parts.push(cur);
+    // a piece of a single line joins its neighbour, so no slide shows just one line
+    for (var k = parts.length - 1; k > 0; k--) if (parts[k].lines.length < 2 && parts[k - 1].lines.length + parts[k].lines.length <= 6 && !parts[k].cue) { parts[k - 1].lines = parts[k - 1].lines.concat(parts[k].lines); parts.splice(k, 1); }
+    if (parts.length > 1 && parts[0].lines.length < 2 && parts[0].lines.length + parts[1].lines.length <= 6) { parts[1].lines = parts[0].lines.concat(parts[1].lines); parts[1].cue = parts[1].cue || parts[0].cue; parts[1].cueText = parts[1].cueText || parts[0].cueText; parts.shift(); }
+    var before = out.length;
     parts.forEach(function(pt){
       chunkLines(pt.lines).forEach(function(ls, i){
-        out.push({n: v.n, cue: i ? null : pt.cue, cueText: i ? '' : pt.cueText, lines: ls.map(function(t){ return pt.ref ? {t: t, ref: true} : {t: t}; })});
+        out.push({n: v.n, cue: i ? null : pt.cue, cueText: i ? '' : pt.cueText, lines: ls.map(function(x){ return x.ref || pt.ref ? {t: x.t, ref: true} : {t: x.t}; })});
       });
     });
-    count++;
+    if (out.length - before > 1) count++;
   });
   return {verses: out, split: count};
 }
@@ -3378,7 +3381,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-20 · 5';
+var APP_VERSION = '2026-10-20 · 6';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
