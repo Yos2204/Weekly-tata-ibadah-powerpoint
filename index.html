@@ -361,6 +361,11 @@ label.f select{padding:7px 8px}
 .dk-lyric{display:flex;flex-direction:column;gap:.38em}
 .dk-lyric p{margin:0;font-weight:500;line-height:1.22;text-wrap:balance}
 .dk-lyric p.ref{font-style:italic;color:var(--dk-ochre)}
+/* the stand / music cue sits above the words, never on top of them */
+.dk-body.has-cue .dk-fit{box-sizing:border-box;padding-top:calc(3.4 * var(--u))}
+/* auto indentation: a line too long for one row continues indented under its first word */
+.dk-lyric p,.dk-row p{padding-left:1.1em;text-indent:-1.1em}
+.dk-al-center .dk-lyric p,.dk-al-right .dk-lyric p,.dk-al-center .dk-row p,.dk-al-right .dk-row p,.dk[data-verse="right"] .dk-lyric p{padding-left:0;text-indent:0}
 .dk-lyric p:not(.ref)+p.ref{margin-top:.35em}
 .dk-qr{flex:none;width:calc(21 * var(--u));margin:0;display:flex;flex-direction:column;align-items:center;gap:calc(.9 * var(--u));align-self:center}
 .dk-qr-card{width:100%;background:#fff;border-radius:calc(1 * var(--u));padding:calc(1.1 * var(--u));box-shadow:0 calc(.6 * var(--u)) calc(2.4 * var(--u)) rgba(0,0,0,.45);box-sizing:border-box;outline:calc(.25 * var(--u)) solid var(--dk-ochre);outline-offset:calc(.5 * var(--u))}
@@ -806,7 +811,7 @@ function Presenter(root, DATA, OPTS){
       var qrHtml = showQr ? '<figure class="dk-qr"><div class="dk-qr-card"><img src="' + qr.src + '" alt="Offering QR code"></div>' + ((qr.caption || word('give')) ? '<figcaption>' + esc(qr.caption || word('give')) + '</figcaption>' : '') + '</figure>' : '';
       h = '<div class="dk-slide' + (showQr ? ' has-qr' : '') + '"><div class="dk-head"><div><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b>' + (sec.ref ? ' · ' + esc(sec.ref) : '') + '</div>' +
           '<div class="dk-title">' + esc(sec.name) + '</div></div>' + (sec.offering ? '<span class="dk-chip">' + esc(sec.offering) + '</span>' : '') + '</div>' +
-          '<div class="dk-body">' + cue + '<div class="dk-vnum' + (String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.n) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
+          '<div class="dk-body' + (cue ? ' has-cue' : '') + '">' + cue + '<div class="dk-vnum' + (String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.n) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
           '</div>';
     }
     slot.innerHTML = h;
@@ -830,11 +835,39 @@ function Presenter(root, DATA, OPTS){
     if (OPTS.standalone) { try { localStorage.setItem(KEY, String(idx)); } catch(e){} }
     if (OPTS.onChange) OPTS.onChange(idx, s);
   }
+  /* auto fit: every slide's text is as large as its space allows, and never runs off the slide */
   function fit(){
-    var el = slot.querySelector('.dk-fit'); if (!el) return;
-    var sl = slides[idx], sc = sl && effStyle(DATA.sections[sl.si]).scale || 1;
-    var size = Math.min(8, (root.classList.contains('portrait') ? 5.6 : 4.4) * sc), setF = function(){ el.style.fontSize = (size * curU) + 'px'; }; setF();
-    while (size > 1.6 && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)) { size -= 0.1; setF(); }
+    var slide = slot.firstElementChild; if (!slide) return;
+    var sl = slides[idx], sc = sl && effStyle(DATA.sections[sl.si]).scale || 1, por = root.classList.contains('portrait');
+    // long hymn or reading names in the header: smaller until they take at most two lines
+    var t = slide.querySelector('.dk-title');
+    if (t) {
+      t.style.fontSize = '';
+      var base = parseFloat(getComputedStyle(t).fontSize) || 0, f = base, two = function(){ return (parseFloat(getComputedStyle(t).lineHeight) || f * 1.1) * 2.3; };
+      while (base && f > base * .55 && t.scrollHeight > two()) { f -= base * .04; t.style.fontSize = f + 'px'; }
+    }
+    // verses and readings: the largest size that still fits (found by halving the range)
+    var el = slide.querySelector('.dk-fit');
+    if (el) {
+      var over = function(){ return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1; };
+      var lo = 1.6, hi = Math.min(9, (por ? 7 : 5.4) * sc), setF = function(x){ el.style.fontSize = (x * curU) + 'px'; };
+      var best = hi; setF(hi);
+      if (over()) { for (var i = 0; i < 14; i++) { var mid = (lo + hi) / 2; setF(mid); if (over()) hi = mid; else lo = mid; } best = lo; setF(lo); }
+      // hymn lines: rather a little smaller than a line breaking in two, as long as it stays easy to read
+      var ps = [].slice.call(el.querySelectorAll('.dk-lyric p'));
+      var wraps = function(){ return ps.some(function(x){ return x.offsetHeight > parseFloat(getComputedStyle(x).lineHeight) * 1.5; }); };
+      var floor = Math.max(1.6, (por ? 4.2 : 3) * Math.min(sc, 1.2));
+      if (ps.length && wraps() && best > floor) {
+        var a = floor, z = best; setF(a);
+        if (!wraps()) { for (var j = 0; j < 12; j++) { var m2 = (a + z) / 2; setF(m2); if (wraps()) z = m2; else a = m2; } setF(a); }
+        else setF(best);
+      }
+    }
+    // title, part and announcement slides: shrink everything together if it would run off the slide
+    if (slide.classList.contains('dk-center')) {
+      var k = 1, setK = function(){ slide.style.setProperty('--dk-scale', (sc * k).toFixed(3)); }; setK();
+      while (k > .4 && (slide.scrollHeight > slide.clientHeight + 1 || slide.scrollWidth > slide.clientWidth + 1)) { k -= .04; setK(); }
+    }
   }
   function updateBar(){
     if (!slides.length) { q('.count').textContent = '0 / 0'; q('.dk-pel').hidden = true; return; }
@@ -2755,9 +2788,9 @@ var STATIC_CSS = 'html:not(.js),html:not(.js) body{height:auto;overflow:auto}htm
   '.pg .th{font:italic 500 20px/1.3 Alegreya,Georgia,serif;color:#dcae63;margin:6px 0}.pg .sm{color:#b7ab9b;letter-spacing:.06em;margin:8px 0 0;font-weight:500}' +
   '.pg h2{font:italic 700 22px/1.2 Alegreya,Georgia,serif;margin:2px 0 10px}.pg header{border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:10px}' +
   '.st .ey{margin:0;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#b7ab9b}.st .ey b{color:#ec7a69}.st .chip{background:#dcae63;color:#1a110c;border-radius:4px;padding:1px 6px;letter-spacing:.06em;white-space:nowrap}' +
-  '.bd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}.bd .ly p{margin:0 0 5px}.vn{font:700 30px/1 Alegreya,Georgia,serif;color:#e0503f;display:flex;flex-direction:column;gap:6px;align-items:flex-start}' +
+  '.bd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}.bd .ly p{margin:0 0 5px;padding-left:1em;text-indent:-1em}.vn{font:700 30px/1 Alegreya,Georgia,serif;color:#e0503f;display:flex;flex-direction:column;gap:6px;align-items:flex-start}' +
   '.cue{font:700 11px "Alegreya Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ec7a69;border:1px solid currentColor;border-radius:3px;padding:1px 5px}' +
-  '.st .ref{font-style:italic;color:#dcae63}.rv{margin:0 0 10px}.rv .n{color:#e0503f;margin-right:8px}.rv .who{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b7ab9b}.rv.alt{color:#dcae63}' +
+  '.st .ref{font-style:italic;color:#dcae63}.rv{margin:0 0 10px;padding-left:1.6em;text-indent:-1.6em}.rv .n{color:#e0503f;margin-right:8px}.rv .who{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b7ab9b}.rv.alt{color:#dcae63}' +
   '.qr{grid-column:1/-1;margin:8px 0 0;display:flex;align-items:center;gap:12px}.qri{width:38%;max-width:170px;aspect-ratio:1;background:#fff center/86% no-repeat;border-radius:10px;outline:2px solid #dcae63;outline-offset:3px}' +
   '.qr figcaption{color:#dcae63;font-size:13px;letter-spacing:.1em;text-transform:uppercase}' +
   '.st .hint{color:#8d8177;font-size:13px;font-weight:500;text-align:center;margin:18px 8px}' +
@@ -3289,7 +3322,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-19 · 3';
+var APP_VERSION = '2026-10-20 · 4';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
