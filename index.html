@@ -293,9 +293,6 @@ label.f select{padding:7px 8px}
 .dk[data-frame="corner"] .dk-stage::before,.dk[data-frame="corner"] .dk-stage::after{content:"";position:absolute;width:calc(9 * var(--u));height:calc(9 * var(--u));border:calc(.35 * var(--u)) solid var(--dk-red);opacity:.85;pointer-events:none;z-index:2}
 .dk[data-frame="corner"] .dk-stage::before{top:calc(2 * var(--u));left:calc(2 * var(--u));border-right:0;border-bottom:0}
 .dk[data-frame="corner"] .dk-stage::after{bottom:calc(2 * var(--u));right:calc(2 * var(--u));border-left:0;border-top:0}
-.dk[data-frame="side"] .dk-band,.dk[data-frame="side"] .dk-rule{display:none}
-.dk[data-frame="side"] .dk-stage::before{content:"";position:absolute;top:0;bottom:0;left:0;width:calc(1.6 * var(--u));background:linear-gradient(var(--dk-red),var(--dk-ochre));pointer-events:none;z-index:2}
-.dk[data-frame="side"] .dk-slide{left:calc(7.5 * var(--u))}
 .dk[data-frame="none"] .dk-band,.dk[data-frame="none"] .dk-rule{display:none}
 /* title styles */
 .dk[data-titles="caps"] .dk-big{font-family:var(--dk-text);font-weight:800;text-transform:uppercase;letter-spacing:.04em;font-size:calc(calc(5.2 * var(--u)) * var(--dk-scale,1))}
@@ -338,7 +335,7 @@ label.f select{padding:7px 8px}
 .dk-bold .dk-row .who{font-weight:800}.dk-slide u{text-decoration-thickness:.06em;text-underline-offset:.12em}
 .dk-ital .dk-lyric p,.dk-ital .dk-row p,.dk-ital .dk-big{font-style:italic}
 .dk-ul .dk-lyric p,.dk-ul .dk-row p,.dk-ul .dk-big{text-decoration:underline;text-decoration-thickness:.06em;text-underline-offset:.14em}
-.dk-col .dk-lyric p:not(.ref),.dk-col .dk-row:not(.alt) p,.dk-col .dk-big{color:var(--dk-tc)}
+.dk-col .dk-lyric p:not(.ref),.dk-col .dk-row:not(.alt) p,.dk-col .dk-big,.dk-col .dk-textbody{color:var(--dk-tc)}
 .dk-al-center .dk-lyric{text-align:center;align-items:center}
 .dk-al-right .dk-lyric{text-align:right;align-items:flex-end}
 .dk-al-center .dk-row p{text-align:center}.dk-al-right .dk-row p{text-align:right}
@@ -384,6 +381,15 @@ label.f select{padding:7px 8px}
 .dk-big.part{font-size:calc(calc(5.4 * var(--u)) * var(--dk-scale,1))}
 .dk-theme{font-family:var(--dk-display);font-style:italic;font-weight:500;font-size:calc(calc(3.6 * var(--u)) * var(--dk-scale,1));color:var(--dk-ochre);text-wrap:balance;max-width:calc(72 * var(--u));line-height:1.15}
 .dk-small{font-size:calc(1.7 * var(--u));color:var(--dk-bone-dim);letter-spacing:.06em}
+/* projector legibility: the words under a heading are near-white and bold, never dim yellow; a soft shadow lifts light text off photos */
+.dk-textbody{font-family:var(--dk-text);font-style:normal;font-weight:700;font-size:calc(calc(3.9 * var(--u)) * var(--dk-scale,1));line-height:1.28;color:var(--dk-bone);max-width:calc(88 * var(--u));text-wrap:balance}
+.dk-text .dk-big{font-size:calc(calc(5 * var(--u)) * var(--dk-scale,1))}
+.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-slide{text-shadow:0 .05em .3em rgba(0,0,0,.65)}
+.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-theme,
+.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-lyric p.ref,
+.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-row.alt p,
+.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-row.alt .who{color:color-mix(in srgb,var(--dk-ochre) 40%,#fff)}
+.dk-theme{font-weight:600}
 .dk-reading{display:flex;flex-direction:column;gap:.75em}
 .dk-row{display:grid;grid-template-columns:7.2em minmax(0,1fr);gap:.25em 1em;align-items:baseline}
 .dk-row .who{font-size:.42em;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--dk-bone-dim);white-space:nowrap}
@@ -745,7 +751,7 @@ function Presenter(root, DATA, OPTS){
     root.classList.toggle('portrait', portrait);
     var sw, sh, u;
     if (portrait) { sw = w; sh = h; u = Math.min(w * .019, h * .0105); }
-    else { sw = Math.min(w, h * 16 / 9); sh = sw * 9 / 16; u = sw / 100; }
+    else { sw = w; sh = h; u = Math.min(w, h * 16 / 9) / 100; }   // fill the whole screen (laptops are often 16:10); sizes follow the shorter side
     stage.style.width = sw + 'px'; stage.style.height = sh + 'px';
     if (Math.abs(u - curU) > .01 || !stage.style.getPropertyValue('--u')) { curU = u; stage.style.setProperty('--u', u + 'px'); }
   }
@@ -793,8 +799,8 @@ function Presenter(root, DATA, OPTS){
     } else if (sec.type === 'part') {
       h = '<div class="dk-slide dk-center"><div class="dk-eyebrow">' + esc(word('oos')) + '</div><div class="dk-big part">' + rich(sec.title) + '</div></div>';
     } else if (sec.type === 'text') {
-      h = '<div class="dk-slide dk-center"><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b></div><div class="dk-big">' + rich(sec.lines[0] || '') + '</div>' +
-          (sec.lines.length > 1 ? '<div class="dk-theme">' + sec.lines.slice(1).map(rich).join('<br>') + '</div>' : '') + '</div>';
+      h = '<div class="dk-slide dk-center dk-text"><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b></div><div class="dk-big">' + rich(sec.lines[0] || '') + '</div>' +
+          (sec.lines.length > 1 ? '<div class="dk-textbody">' + sec.lines.slice(1).map(rich).join('<br>') + '</div>' : '') + '</div>';
     } else if (sec.type === 'reading') {
       var rows = sec.pages[s.vi].map(function(x){
         return '<div class="dk-row' + (x.alt ? ' alt' : '') + (x.role ? '' : ' plain') + '"><span class="who"><i>' + esc(x.v) + '</i>' + esc(roleLabel(x.role)) + '</span><p>' + rich(x.t) + '</p></div>';
@@ -823,7 +829,7 @@ function Presenter(root, DATA, OPTS){
     }
     root.setAttribute('data-tr', DATA.transition || 'fade');
     var lk = DATA.look || {};
-    root.setAttribute('data-look', lk.theme || 'classic'); root.setAttribute('data-frame', lk.frame || 'band');
+    root.setAttribute('data-look', lk.theme || 'classic'); root.setAttribute('data-frame', !lk.frame || lk.frame === 'side' ? 'band' : lk.frame);   // the old left-edge bar is retired
     root.setAttribute('data-titles', lk.titles || 'serif'); root.setAttribute('data-verse', lk.verse || 'side');
     root.setAttribute('data-lang', DATA.lang || 'bbc');
     root.classList.toggle('dk-bold', DATA.bold !== false);
@@ -864,9 +870,13 @@ function Presenter(root, DATA, OPTS){
       }
     }
     // title, part and announcement slides: shrink everything together if it would run off the slide
+    // (announcement slides may grow to fill the screen; titles grow a little)
     if (slide.classList.contains('dk-center')) {
-      var k = 1, setK = function(){ slide.style.setProperty('--dk-scale', (sc * k).toFixed(3)); }; setK();
-      while (k > .4 && (slide.scrollHeight > slide.clientHeight + 1 || slide.scrollWidth > slide.clientWidth + 1)) { k -= .04; setK(); }
+      var setK = function(k){ slide.style.setProperty('--dk-scale', (sc * k).toFixed(3)); };
+      var cOver = function(){ return slide.scrollHeight > slide.clientHeight + 1 || slide.scrollWidth > slide.clientWidth + 1; };
+      var kLo = .4, kHi = slide.classList.contains('dk-text') ? 1.9 : 1.25;
+      setK(kHi);
+      if (cOver()) { for (var c = 0; c < 12; c++) { var km = (kLo + kHi) / 2; setK(km); if (cOver()) kHi = km; else kLo = km; } setK(kLo); }
     }
   }
   function updateBar(){
@@ -1865,7 +1875,7 @@ var LOOKS = {
   classic: {name: 'Classic red', frame: 'band',   titles: 'serif', verse: 'side',  bgs: ['candle','ulos','dawn'],  covers: ['c-cross','c-bible','c-chirho']},
   advent:  {name: 'Royal violet', frame: 'corner', titles: 'serif', verse: 'stack', bgs: ['stars','glass','glory'], covers: ['c-window','c-dove','c-chirho']},
   olive:   {name: 'Olive green', frame: 'rule',   titles: 'soft',  verse: 'side',  bgs: ['olive','water','dawn'],  covers: ['c-fish','c-dove','c-bible']},
-  sea:     {name: 'Deep sea',    frame: 'side',   titles: 'caps',  verse: 'stack', bgs: ['water','stars','glass'], covers: ['c-dove','c-fish','c-window']},
+  sea:     {name: 'Deep sea',    frame: 'band',   titles: 'caps',  verse: 'stack', bgs: ['water','stars','glass'], covers: ['c-dove','c-fish','c-window']},
   ember:   {name: 'Warm ember',  frame: 'band',   titles: 'caps',  verse: 'right', bgs: ['candle','glory','ulos'], covers: ['c-cross','c-chirho','c-bible']},
   linen:   {name: 'Light linen', frame: 'rule',   titles: 'soft',  verse: 'side',  bgs: ['linen'],                 covers: ['linen']}
 };
@@ -3381,7 +3391,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-20 · 6';
+var APP_VERSION = '2026-10-25 · 8';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
