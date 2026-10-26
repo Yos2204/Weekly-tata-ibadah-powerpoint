@@ -3334,6 +3334,8 @@ async function saveLocal(f){
   if (IS_IOS) { try { return await shareFile(f); } catch (e) { if (e && e.name === 'AbortError') throw e; } }
   downloadFile(f); return 'downloaded';
 }
+// After OK · save HTML, show the finished slideshow full screen right away (YB 2026-10-26, Jarvis "go").
+function autoPresent(){ setTimeout(function(){ try { var r = rvEl('review'); if (r) r.remove(); } catch (e) {} $('bPresent').click(); }, 400); }
 async function autoSave(){
   rvEl('rvOk').disabled = true; rvEl('rvOk2').disabled = true; step('review', 'done'); step('save', 'busy');
   rvEl('review').hidden = false; rvEl('rvBar').hidden = true;
@@ -3364,6 +3366,7 @@ async function autoSave(){
           ['Also save on this phone', function(){ saveLocal(lastSaved).catch(function(){}); }],
           ['Make another', function(){ autoPickScreen(); }]
         ]);
+        autoPresent();
         return;
       } catch (err) { rvEl('rvOut').textContent = 'Could not reach the PC (' + err.message + '). Saving on this phone instead…'; }
     }
@@ -3376,6 +3379,7 @@ async function autoSave(){
         [IS_TOUCH ? 'Share or save again' : 'Save again', function(){ saveLocal(lastSaved).catch(function(){}); }],
         ['Make another', function(){ autoPickScreen(); }]
       ]);
+      autoPresent();
     } catch (err) {
       step('save', 'fail'); rvEl('rvOk').disabled = false;
       rvEl('rvOut').textContent = err && (err.name === 'AbortError' || err.code === 'declined') ? 'Not saved: the save was cancelled. Tap OK again to save.' : 'Saving failed: ' + ((err && (err.message || err.code)) || 'unknown') + '. Tap OK again.';
