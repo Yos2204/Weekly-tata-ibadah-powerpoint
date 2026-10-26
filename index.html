@@ -66,6 +66,8 @@
 .sp-close{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:1px solid var(--wb-line);background:var(--wb-bg);color:var(--wb-fg);font:inherit;font-size:26px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0 0 3px;z-index:2}
 .sp-close:hover{border-color:var(--wb-dim)}
 .sp-card .sp-kick{padding-right:48px}
+.go-send{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:1001;border:0;border-radius:999px;padding:12px 18px;background:#25D366;color:#062b16;font:700 15px/1 var(--wb-font,system-ui);box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer}
+.go-send[hidden]{display:none}
 .sp-ver{margin:-6px 0 0;text-align:center;font-size:12px;color:var(--wb-dim)}
 .sp-x{align-self:center;font:inherit;background:none;border:0;color:var(--wb-dim);text-decoration:underline;cursor:pointer;font-size:14px}
 </style>
@@ -2799,7 +2801,7 @@ function setPresent(v){
 }
 /* Inside the Sada HKBPS app the page cannot go full screen on iPhone, so the app hides its own bar and lets the frame cover the whole screen (portrait and landscape). */
 function framed(){ try { return window.top !== window; } catch (e) { return true; } }
-function frameFull(on){ if (!framed()) return; try { window.parent.postMessage({ wb: 'present', on: !!on }, '*'); } catch (e) {} }
+function frameFull(on){ try { document.dispatchEvent(new CustomEvent('wb-present', { detail: !!on })); } catch (e) {} if (!framed()) return; try { window.parent.postMessage({ wb: 'present', on: !!on }, '*'); } catch (e) {} }
 $('bPresent').onclick = async function(){
   try { await $('deck').requestFullscreen(); try { await navigator.wakeLock.request('screen'); } catch(e){} setPresent(true); }
   catch(e){ setPresent(true); }
@@ -3316,7 +3318,7 @@ async function autoRun(localFile){
     refreshReviewDeck();
     rvEl('rvOk').disabled = false;
     // Jarvis "go": show the full-screen preview now (the review stays behind it, closing the preview returns to OK · save HTML)
-    if (ssGet('ti-go')) { ssSet('ti-go', ''); setTimeout(function(){ $('bPresent').click(); }, 300); }
+    if (ssGet('ti-go')) { ssSet('ti-go', ''); setTimeout(function(){ $('bPresent').click(); }, 300); setTimeout(goSend, 1500); }
     step('spell', 'busy');
     rvSpell = await runSpellCheck(function(t){ rvEl('rvSpellNote').textContent = t; });
     renderSpell(); step('spell', 'done'); step('review', 'busy');
@@ -3510,6 +3512,7 @@ async function goStart(){
     if (!files.length) throw new Error('empty');
     files.sort(function(a, b){ return (b.score - a.score) || (a.i - b.i); });
     var f = files[0];
+    GO_FILE = { name: f.name, link: f.link || '' }; GO_SEND = j.send_to || null;
     spCard('<p class="sp-kick">Jarvis · go</p><h2 id="spTitle">Found it</h2><p class="sp-msg"><b>' + escH(f.name) + '</b><br>Getting it from the church folder…</p>');
     var d = await churchDrive({id: f.id}); if (!d.ok) throw new Error('download');
     var name = decodeURIComponent(d.headers.get('x-name') || f.name), blob = await d.blob();
@@ -3518,6 +3521,28 @@ async function goStart(){
     if (gClientId()) autoFind(); else goPick();
   }
 }
+/* After "go" has built the preview: hand the Tata Ibadah to the chairman on WhatsApp (YB 2026-10-26).
+   The recipient comes from the church settings (never from this file). WhatsApp opens with the message and the file's Drive link ready; YB taps Send.
+   A web page cannot send a WhatsApp message by itself, so the pill stays on screen in case the phone blocked the automatic jump. */
+var GO_FILE = null, GO_SEND = null;
+function goWaUrl(scheme){
+  var txt = 'Tata Ibadah ' + sundayLabel(nextSunday()) + (GO_FILE && GO_FILE.name ? ' – ' + GO_FILE.name : '') + (GO_FILE && GO_FILE.link ? '\n' + GO_FILE.link : '');
+  var ph = GO_SEND.phone.length === 8 ? '65' + GO_SEND.phone : GO_SEND.phone;
+  return scheme ? 'whatsapp://send?phone=' + ph + '&text=' + encodeURIComponent(txt) : 'https://wa.me/' + ph + '?text=' + encodeURIComponent(txt);
+}
+function goSend(){
+  if (!GO_SEND || !GO_FILE) return;
+  var b = document.getElementById('goSend');
+  if (!b) {
+    b = document.createElement('button'); b.id = 'goSend'; b.type = 'button'; b.className = 'go-send';
+    b.onclick = function(){ try { window.open(goWaUrl(false), '_blank'); } catch (e) { location.href = goWaUrl(true); } };
+    document.body.appendChild(b);
+  }
+  b.textContent = 'WhatsApp → ' + (GO_SEND.name || GO_SEND.phone);
+  b.hidden = false;
+  try { location.href = goWaUrl(true); } catch (e) {}
+}
+document.addEventListener('wb-present', function(e){ var b = document.getElementById('goSend'); if (b && !e.detail) b.hidden = true; });
 /* Jarvis "go" without Google Drive set up: one tap opens the phone's file picker (Browse → Google Drive), then straight to the preview */
 function goPick(){
   spCard('<p class="sp-kick">Jarvis · go</p><h2 id="spTitle">Slides for ' + escH(sundayLabel(nextSunday())) + '</h2>' +
