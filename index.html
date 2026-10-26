@@ -1036,7 +1036,7 @@ function Presenter(root, DATA, OPTS){
   }
   function closeOv(){ q('.dk-sections').hidden = true; q('.dk-help').hidden = true; }
   function ovOpen(){ return !q('.dk-sections').hidden || !q('.dk-help').hidden; }
-  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) { var fb = bar.querySelector('[data-a="full"]'); if (fb) fb.hidden = true; }
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled) || (framed() && !document.fullscreenEnabled)) { var fb = bar.querySelector('[data-a="full"]'); if (fb) fb.hidden = true; }
   function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
   async function full(){
     var el = OPTS.standalone ? document.documentElement : root;
@@ -1047,7 +1047,10 @@ function Presenter(root, DATA, OPTS){
         else throw new Error('none');
         try { await navigator.wakeLock.request('screen'); } catch(e){}
       } else if (document.exitFullscreen) await document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    } catch(e){ note('This phone does not let web pages go full screen. Turn it sideways: the browser bars shrink. From a hosted link, “Add to Home Screen” opens it full screen.'); }
+    } catch(e){
+      if (framed()) { frameFull(true); note('Showing full screen inside the app. Add Sada HKBPS to your Home Screen to hide the browser bars too.'); }
+      else note('This phone does not let web pages go full screen. Turn it sideways: the browser bars shrink. From a hosted link, “Add to Home Screen” opens it full screen.');
+    }
   }
   var noteT;
   function note(t){ var n = q('.dk-note'); n.textContent = t; n.hidden = false; clearTimeout(noteT); noteT = setTimeout(function(){ n.hidden = true; }, 6000); }
@@ -2792,7 +2795,11 @@ function setPresent(v){
   var d = $('deck');
   if (v && !document.fullscreenElement) d.style.cssText = 'position:fixed;inset:0;z-index:1000;width:auto;height:auto';
   else d.style.cssText = '';
+  frameFull(v);
 }
+/* Inside the Sada HKBPS app the page cannot go full screen on iPhone, so the app hides its own bar and lets the frame cover the whole screen (portrait and landscape). */
+function framed(){ try { return window.top !== window; } catch (e) { return true; } }
+function frameFull(on){ if (!framed()) return; try { window.parent.postMessage({ wb: 'present', on: !!on }, '*'); } catch (e) {} }
 $('bPresent').onclick = async function(){
   try { await $('deck').requestFullscreen(); try { await navigator.wakeLock.request('screen'); } catch(e){} setPresent(true); }
   catch(e){ setPresent(true); }
