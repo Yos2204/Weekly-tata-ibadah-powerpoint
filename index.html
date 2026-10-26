@@ -3443,7 +3443,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-25 · 8';
+var APP_VERSION = '2026-10-27 · 9';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
@@ -3578,7 +3578,9 @@ function startPopup(){
   document.getElementById('spAuto').onclick = autoFind;
   spWireManual();
 }
+function churchTok(){ try { return JSON.parse(localStorage.getItem('hkbp.remote.token') || '""') || ''; } catch (e) { return ''; } }
 function autoWhere(){
+  if (churchTok()) return 'Looks in the church’s Google Drive folder for this Sunday’s file (no sign-in needed).';
   if (FS_OK) return 'Looks in your Tata Ibadah folder and in Google Drive for the newest file for this Sunday.';
   if (IS_ANDROID) return 'Takes a file you shared from WhatsApp to the Tata Ibadah app, or finds this Sunday’s file in Google Drive.';
   return 'Finds this Sunday’s file in Google Drive, including files you saved there from WhatsApp.';
@@ -3591,7 +3593,10 @@ async function autoFind(){
   if (shared) { spClose(); return autoRun(shared); }
   // 2. the watched folder on a computer
   if (FS_OK && await watchLoad()) { spClose(); return autoPickScreen('Folder autopilot'); }
-  // 3. Google Drive
+  // 2b. inside Sada (maker signed in): the church's shared Drive folder through hkbp-drive, same as Jarvis "go" (YB 2026-10-27); once per attempt so a miss falls through to 3
+  if (churchTok() && !autoFind.church) { autoFind.church = true; return goStart(); }
+  autoFind.church = false;
+  // 3. the maker's own Google Drive (needs a Google client ID)
   if (!gClientId()) return driveSetup();
   if (!gToken()) return driveConnect();
   spCard('<p class="sp-kick">Finding it automatically</p><h2 id="spTitle">Looking in Google Drive…</h2><p class="sp-msg" id="spMsg">Searching for the Tata Ibadah for ' + escH(sundayLabel(sun)) + '.</p>');
