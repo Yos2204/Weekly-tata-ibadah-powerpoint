@@ -3,6 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Access gate (YB 2026-10-26): the workbench opens only inside the Sada HKBPS app, for a signed-in Multimedia maker or the admin. -->
+<style id="wb-gate-css">html{visibility:hidden}</style>
+<script>
+(function () {
+  var URL_ = "https://tbicfofdorwrupzlqgdm.supabase.co/rest/v1/rpc/hk_wb_access";
+  var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiaWNmb2Zkb3J3cnVwemxxZ2RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3OTk4OTEsImV4cCI6MjEwODM3NTg5MX0.Wd9o5C6yv_1rtoM0Y1dDRXsRmoUU-gc9IprMUldZ2dI";
+  var APP = "https://yos2204.github.io/butet/hkbp/";
+  function pass() { var s = document.getElementById("wb-gate-css"); if (s) s.remove(); }
+  function block() {
+    try { window.stop(); } catch (e) {}
+    var html = '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sada HKBPS</title></head>' +
+      '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#f3f4f8;font-family:system-ui,sans-serif;color:#1b1f3b">' +
+      '<div style="max-width:380px;margin:16px;padding:24px;background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.08);text-align:center">' +
+      '<div style="font-size:40px">🔒</div><h2 style="margin:8px 0">Tata Ibadah Workbench</h2>' +
+      '<p>Hanya bisa dibuka lewat aplikasi <b>Sada HKBPS</b> oleh Maker Multimedia.</p>' +
+      '<p style="color:#667">Only available inside the Sada HKBPS app, for Multimedia Makers.</p>' +
+      '<a href="' + APP + '" target="_top" style="display:inline-block;margin-top:8px;padding:12px 18px;border-radius:12px;background:#2e3192;color:#fff;text-decoration:none;font-weight:700">Buka Sada HKBPS</a></div></body>';
+    var go = function () { document.documentElement.innerHTML = html; pass(); };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else go();
+  }
+  var inApp = false, tok = null;
+  try { inApp = window.top !== window && /\/hkbp\//.test(window.top.location.pathname); } catch (e) {}
+  try { tok = JSON.parse(localStorage.getItem("hkbp.remote.token")); } catch (e) {}
+  if (!inApp || !tok) { block(); return; }
+  var mark = "wb.ok." + String(tok).slice(0, 12);
+  fetch(URL_, { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_token: tok }) })
+    .then(function (r) { return r.json(); })
+    .then(function (ok) { if (ok === true) { try { localStorage.setItem(mark, String(Date.now())); } catch (e) {} pass(); } else block(); })
+    .catch(function () { // offline: allow a maker who was checked on this phone in the last 7 days
+      var t = 0; try { t = +localStorage.getItem(mark) || 0; } catch (e) {}
+      if (Date.now() - t < 7 * 864e5) pass(); else block();
+    });
+})();
+</script>
 <style>body{margin:0}img{max-width:100%}/* start-up pop-up: automatic or manual */
 .sp,.sp *{box-sizing:border-box}
 .sp{position:fixed;inset:0;z-index:70;background:rgba(17,13,12,.55);display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));overflow:auto}
