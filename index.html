@@ -68,6 +68,7 @@
 .sp-card .sp-kick{padding-right:48px}
 .go-send{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:1001;border:0;border-radius:999px;padding:12px 18px;background:#25D366;color:#062b16;font:700 15px/1 var(--wb-font,system-ui);box-shadow:0 8px 24px rgba(0,0,0,.35);cursor:pointer}
 .go-send[hidden]{display:none}
+.go-send.done{background:#e8f5ec;color:#1b5e20;cursor:default}
 .sp-ver{margin:-6px 0 0;text-align:center;font-size:12px;color:var(--wb-dim)}
 .sp-x{align-self:center;font:inherit;background:none;border:0;color:var(--wb-dim);text-decoration:underline;cursor:pointer;font-size:14px}
 </style>
@@ -3496,11 +3497,12 @@ function spWireManual(){
 
 /* Jarvis "go": first the church's shared Google Drive folder (read for us by Sada HKBPS, no Google sign-in), then Google Drive, then one tap */
 var CHURCH_DRIVE = 'https://tbicfofdorwrupzlqgdm.supabase.co/functions/v1/hkbp-drive';
+var CHURCH_WA = 'https://tbicfofdorwrupzlqgdm.supabase.co/functions/v1/hkbp-wa';
 var CHURCH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiaWNmb2Zkb3J3cnVwemxxZ2RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3OTk4OTEsImV4cCI6MjEwODM3NTg5MX0.Wd9o5C6yv_1rtoM0Y1dDRXsRmoUU-gc9IprMUldZ2dI';
-function churchDrive(body){
+function churchDrive(body, url){
   var tok = ''; try { tok = JSON.parse(localStorage.getItem('hkbp.remote.token') || '""'); } catch (e) {}
   body.token = tok;
-  return fetch(CHURCH_DRIVE, {method: 'POST', headers: {apikey: CHURCH_KEY, Authorization: 'Bearer ' + CHURCH_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  return fetch(url || CHURCH_DRIVE, {method: 'POST', headers: {apikey: CHURCH_KEY, Authorization: 'Bearer ' + CHURCH_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
 }
 async function goStart(){
   var sun = nextSunday();
@@ -3512,35 +3514,49 @@ async function goStart(){
     if (!files.length) throw new Error('empty');
     files.sort(function(a, b){ return (b.score - a.score) || (a.i - b.i); });
     var f = files[0];
-    GO_FILE = { name: f.name, link: f.link || '' }; GO_SEND = j.send_to || null;
+    GO_FILE = { id: f.id, name: f.name, link: f.link || '' }; GO_SEND = j.send_to || null;
     spCard('<p class="sp-kick">Jarvis · go</p><h2 id="spTitle">Found it</h2><p class="sp-msg"><b>' + escH(f.name) + '</b><br>Getting it from the church folder…</p>');
     var d = await churchDrive({id: f.id}); if (!d.ok) throw new Error('download');
     var name = decodeURIComponent(d.headers.get('x-name') || f.name), blob = await d.blob();
-    spClose(); autoRun(new File([blob], name, {type: blob.type || 'application/octet-stream'}));
+    var file = new File([blob], name, {type: blob.type || 'application/octet-stream'}); GO_FILE.file = file;
+    spClose(); autoRun(file);
   } catch (err) {
     if (gClientId()) autoFind(); else goPick();
   }
 }
-/* After "go" has built the preview: hand the Tata Ibadah to the chairman on WhatsApp (YB 2026-10-26).
-   The recipient comes from the church settings (never from this file). WhatsApp opens with the message and the file's Drive link ready; YB taps Send.
-   A web page cannot send a WhatsApp message by itself, so the pill stays on screen in case the phone blocked the automatic jump. */
+/* After "go" has built the preview: the Tata Ibadah file goes to the chairman on WhatsApp (YB 2026-10-26).
+   1. No tap: the church's hkbp-wa function sends the file itself through the WhatsApp Business API (recipient and token live on the server, never here).
+   2. Until that is configured, or if it fails: a pill shares the .docx through the phone's share sheet (WhatsApp → Gultom → Send). */
 var GO_FILE = null, GO_SEND = null;
-function goWaUrl(scheme){
-  var txt = 'Tata Ibadah ' + sundayLabel(nextSunday()) + (GO_FILE && GO_FILE.name ? ' – ' + GO_FILE.name : '') + (GO_FILE && GO_FILE.link ? '\n' + GO_FILE.link : '');
-  var ph = GO_SEND.phone.length === 8 ? '65' + GO_SEND.phone : GO_SEND.phone;
-  return scheme ? 'whatsapp://send?phone=' + ph + '&text=' + encodeURIComponent(txt) : 'https://wa.me/' + ph + '?text=' + encodeURIComponent(txt);
-}
-function goSend(){
-  if (!GO_SEND || !GO_FILE) return;
+function goPill(text, onTap){
   var b = document.getElementById('goSend');
-  if (!b) {
-    b = document.createElement('button'); b.id = 'goSend'; b.type = 'button'; b.className = 'go-send';
-    b.onclick = function(){ try { window.open(goWaUrl(false), '_blank'); } catch (e) { location.href = goWaUrl(true); } };
-    document.body.appendChild(b);
+  if (!b) { b = document.createElement('button'); b.id = 'goSend'; b.type = 'button'; b.className = 'go-send'; document.body.appendChild(b); }
+  b.textContent = text; b.onclick = onTap || null; b.classList.toggle('done', !onTap); b.hidden = false;
+  clearTimeout(goPill.t); if (!onTap) goPill.t = setTimeout(function(){ b.hidden = true; }, 8000);
+}
+function goWaUrl(){
+  var txt = 'Tata Ibadah ' + sundayLabel(nextSunday()) + (GO_FILE && GO_FILE.name ? ' – ' + GO_FILE.name : '');
+  var ph = GO_SEND.phone.length === 8 ? '65' + GO_SEND.phone : GO_SEND.phone;
+  return 'https://wa.me/' + ph + '?text=' + encodeURIComponent(txt);
+}
+function goShareFile(){
+  var who = GO_SEND.name || GO_SEND.phone, f = GO_FILE.file;
+  if (f && navigator.share && (!navigator.canShare || navigator.canShare({files: [f]}))) {
+    navigator.share({files: [f], title: f.name, text: 'Tata Ibadah ' + sundayLabel(nextSunday())}).then(function(){ goPill('Sent to ' + who + ' ✓'); }).catch(function(){});
+  } else {
+    try { window.open(goWaUrl(), '_blank'); } catch (e) { location.href = goWaUrl(); }
   }
-  b.textContent = 'WhatsApp → ' + (GO_SEND.name || GO_SEND.phone);
-  b.hidden = false;
-  try { location.href = goWaUrl(true); } catch (e) {}
+}
+async function goSend(){
+  if (!GO_SEND || !GO_FILE) return;
+  var who = GO_SEND.name || GO_SEND.phone;
+  goPill('Sending to ' + who + '…');
+  try {
+    var r = await churchDrive({id: GO_FILE.id, sunday: sundayLabel(nextSunday())}, CHURCH_WA); var j = await r.json().catch(function(){ return {}; });
+    if (r.ok && j.ok) { goPill((j.already ? 'Already sent to ' : 'Sent to ') + who + ' ✓'); return; }
+    console.warn('hkbp-wa', r.status, j);
+  } catch (e) { console.warn('hkbp-wa', e); }
+  goPill('Send the file to ' + who, goShareFile);
 }
 document.addEventListener('wb-present', function(e){ var b = document.getElementById('goSend'); if (b && !e.detail) b.hidden = true; });
 /* Jarvis "go" without Google Drive set up: one tap opens the phone's file picker (Browse → Google Drive), then straight to the preview */
