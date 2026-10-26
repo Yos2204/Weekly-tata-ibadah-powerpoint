@@ -25,6 +25,8 @@
   }
   var inApp = false, tok = null;
   try { inApp = window.top !== window && /\/hkbp\//.test(window.top.location.pathname); } catch (e) {}
+  // back from Google Drive sign-in started inside the app (same tab): still needs the maker check below
+  try { if (!inApp && window.top === window && /access_token=|error=/.test(location.hash) && sessionStorage.getItem("ti-gdrive-state")) inApp = true; } catch (e) {}
   try { tok = JSON.parse(localStorage.getItem("hkbp.remote.token")); } catch (e) {}
   if (!inApp || !tok) { block(); return; }
   var mark = "wb.ok." + String(tok).slice(0, 12);
@@ -3306,6 +3308,8 @@ async function autoRun(localFile){
     rvEl('rvOut').innerHTML = 'OK saves <b>' + escH(autoInfo.outName) + '</b> in ' + escH(autoInfo.outFolder || autoInfo.folder) + '.';
     refreshReviewDeck();
     rvEl('rvOk').disabled = false;
+    // Jarvis "go": show the full-screen preview now (the review stays behind it, closing the preview returns to OK · save HTML)
+    if (ssGet('ti-go')) { ssSet('ti-go', ''); setTimeout(function(){ $('bPresent').click(); }, 300); }
     step('spell', 'busy');
     rvSpell = await runSpellCheck(function(t){ rvEl('rvSpellNote').textContent = t; });
     renderSpell(); step('spell', 'done'); step('review', 'busy');
@@ -3481,6 +3485,13 @@ function spWireManual(){
   var back = document.getElementById('spBack'); if (back) back.onclick = startPopup;
 }
 
+/* Jarvis "go" without Google Drive set up: one tap opens the phone's file picker (Browse → Google Drive), then straight to the preview */
+function goPick(){
+  spCard('<p class="sp-kick">Jarvis · go</p><h2 id="spTitle">Slides for ' + escH(sundayLabel(nextSunday())) + '</h2>' +
+    '<p class="sp-msg">Tap below, then <b>Browse → Google Drive</b> and pick this Sunday’s Tata Ibadah. The preview opens by itself.</p>' +
+    spManualBtn('Pick the Tata Ibadah') + '<button class="sp-x" id="spFull">Open the full workbench instead</button>');
+  spWireManual();
+}
 /* the pop-up itself */
 function startPopup(){
   var sun = nextSunday();
@@ -3564,7 +3575,7 @@ function driveConnect(){
   spWireManual();
   document.getElementById('spGo').onclick = function(){
     var st = Math.random().toString(36).slice(2) + Date.now().toString(36); ssSet('ti-gdrive-state', st);
-    location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({client_id: gClientId(), redirect_uri: gRedirect(), response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.readonly', include_granted_scopes: 'true', state: st}).toString();
+    (window.top !== window ? window.top : window).location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({client_id: gClientId(), redirect_uri: gRedirect(), response_type: 'token', scope: 'https://www.googleapis.com/auth/drive.readonly', include_granted_scopes: 'true', state: st}).toString();
   };
 }
 /* Google Drive needs a client ID once; shown only while none is set */
@@ -3605,6 +3616,8 @@ else if (/[?&](app|autopilot|shared)=1\b/.test(location.search)) setTimeout(asyn
   try { history.replaceState(null, '', location.pathname + '?app=1' + (HUB_KEY ? '&k=' + HUB_KEY : '')); } catch (e) {}
   if (f) autoRun(f); else startPopup();
 }, 50);
+/* Jarvis "go" (YB 2026-10-26): find this Sunday's file by itself, then show the HTML preview full screen */
+else if (/[?&]go=1\b/.test(location.search)) { ssSet('ti-go', '1'); setTimeout(gClientId() ? autoFind : goPick, 50); }
 /* every start opens the pop-up: find this Sunday's Tata Ibadah automatically, or choose it by hand ("?full=1" skips it) */
 else if (!/[?&]full=1\b/.test(location.search)) setTimeout(startPopup, 50);
 
