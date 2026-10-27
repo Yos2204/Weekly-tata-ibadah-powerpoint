@@ -1344,11 +1344,21 @@ function buildService(headers, rawRows, fileName, source){
   });
   rawRows = expanded;
   rawRows.forEach(function(cells){
+    // "No. | Acara Ibadah" layout (two columns, the first only a running number; 1 Nov 2026 file): the heading is the first
+    // paragraph of the second cell, e.g. "BERNYANYI KJ No. 407: 1-2 “Tuhan, Kau Gembala Kami”" or "EPISTEL: MAZMUR 43: 1-5"
+    if (cells.length === 2 && cells[0] && cells[1] && /^\d{1,2}\.?$/.test(cells[0].map(function(p){ return p.t; }).join(' ').trim())) {
+      var ps = cells[1].filter(function(p){ return p.t && p.t.trim(); }), h = ps.length ? ps[0].t.trim() : '', hm;
+      if (!ps.length) return;
+      if (SING.test(h) && (hm = /^(\S+)\s+(.+)$/.exec(h))) cells = [[{t: hm[1]}], [{t: hm[2]}], ps.slice(1)];
+      else if ((hm = /^([^:]{3,40}?)\s*:\s*(.+)$/.exec(h))) cells = [[{t: hm[1]}], [{t: hm[2]}], ps.slice(1)];
+      else cells = [[{t: h}], [], ps.slice(1)];
+    }
     var title = cells[0] ? cells[0].map(function(p){ return p.t; }).join(' ') : '';
     var sub = cells.length >= 3 && cells[1] ? cells[1].map(function(p){ return p.t; }).join(' ') : '';
     var det = (cells.length >= 3 ? cells[2] : cells[1]) || [];
     det = det.filter(function(p){ return p.t && p.t !== '-' && p.t !== '–'; });
     if (/^title$/i.test(title.trim()) && /^sub\s*title$/i.test(sub.trim())) return;   // header row
+    if (/^no\.?$/i.test(title.trim()) && !sub.trim() && det.length === 1 && /^acara|^tata|^order/i.test(det[0].t)) return;   // "No. | Acara Ibadah" header row
     if (/^\s*link\s*:/i.test(title)) return;
     if (!title.trim() && !sub.trim() && !det.length) return;
     var label = tidyCase(title);
@@ -1375,6 +1385,8 @@ function buildService(headers, rawRows, fileName, source){
       });
       if (sitems.length) { sections.push(normalize({type:'reading', title: label, ref: sref || notes.shift() || '', note: notes.join(' · '), items: sitems})); return; }
     }
+    // a reading or sermon row with only its reference ("Epistel | Mazmur 43: 1-5"): a slide with the reference (the Epistel verses are fetched by enrichReadings)
+    if (sub.trim() && !det.length && SCRIPTURE.test(label) && !isHymnRef) { sections.push({type:'text', title: label, lines: [tidyCase(sub.replace(/\*+/g, ''))]}); return; }
     if (sub.trim() && det.length) {
       var sm = /^(.*?)\s*[“”"](.+?)[“”"]\s*(.*)$/.exec(sub);
       var ref = (sm ? sm[1] : sub).replace(/\bNO\./, 'No.').replace(/\s*\([^)]*(?:pelean|persembahan|offering|kolekte)[^)]*\)/i, '').replace(/\s+/g, ' ').trim().replace(/-/g, '–');
@@ -1425,7 +1437,7 @@ function buildService(headers, rawRows, fileName, source){
       return;
     }
     if (det.length) { sections.push({type:'text', title: label, lines: det.map(function(p){ return tidyCase(p.t); })}); return; }
-    if (label) sections.push({type:'part', title: label.replace(/\s+[–—-]+\s+/g, ' · ')});
+    if (label) sections.push({type:'part', title: label.replace(/\s*[–—-]+\s+|\s+[–—-]+\s*/g, ' · ')});
   });
   if (sections.length < 3) warnings.push('Only ' + (sections.length - 1) + ' part(s) were found. Check that the file uses the usual table with Title, Sub Title and Detail columns.');
   return {meta: meta, sections: sections, warnings: warnings};
@@ -1718,6 +1730,45 @@ function slidesToService(slides, fileName){
   return res;
 }
 async function parseServiceFile(file){
+  var p = await parseAnyFile(file);
+  return enrichReadings(p);
+}
+/* ---- Epistel / Evangelium rows that carry only a reference ("EPISTEL: MAZMUR 43: 1-5"): fetch the verses through hkbp-bible
+   (YB 2026-10-27) and make a reading of them, one verse per slide, Liturgis / Jemaat alternating. The Bible version and the role
+   names follow the language of the service: Indonesian (TB), English (ESV), Batak Toba (Bibel). A miss leaves the row as it was. ---- */
+var CHURCH_BIBLE = 'https://tbicfofdorwrupzlqgdm.supabase.co/functions/v1/hkbp-bible';
+var EPISTEL = /^(epistel|epistle|evangelium|gospel|injil)\b\s*[:·.\-–—]?\s*/i;
+var REF_RX = /^(?:[1-3]|I{1,3})?\s*\.?\s*[A-Za-zÀ-ÿ'’.\- ]{2,}?\s*\.?\s*\d+(?:\s*[:.,;]\s*\d+(?:\s*[-–—]\s*(?:\d+\s*:\s*)?\d+)?(?:\s*[,;]\s*\d+(?:\s*[-–—]\s*\d+)?)*|\s*[-–—]\s*\d+)?\s*[a-c]?$/;
+var READ_ROLES = {id: ['Liturgis', 'Jemaat'], en: ['Liturgist', 'Congregation'], bbc: ['Paragenda', 'Ruas']};
+function epistelRef(sec){
+  if (sec.type !== 'part' && sec.type !== 'text') return null;
+  var head = String(sec.title || ''), lines = (sec.lines || []).slice(), m = EPISTEL.exec(head);
+  if (!m && lines.length && EPISTEL.test(lines[0])) { head = lines.shift(); m = EPISTEL.exec(head); }   // "08 | Epistel: Mazmur 43: 1-5"
+  if (!m) return null;
+  var ref = head.slice(m[0].length).replace(/\*+/g, '').trim() || String(lines[0] || '').replace(/\*+/g, '').trim();
+  if (!REF_RX.test(ref)) return null;
+  var rest = head.slice(m[0].length).trim() ? lines : lines.slice(1);
+  return {label: tidyCase(m[1]), ref: tidyCase(ref), note: rest.map(tidyCase).join(' · ')};
+}
+async function enrichReadings(p){
+  var lang = langOfParsed(p.meta, p.sections), roles = READ_ROLES[lang] || READ_ROLES.id;
+  p.warnings = p.warnings || [];
+  for (var i = 0; i < p.sections.length; i++) {
+    var e = epistelRef(p.sections[i]); if (!e) continue;
+    try {
+      var r = await fetch(CHURCH_BIBLE, {method: 'POST', headers: {apikey: CHURCH_KEY, Authorization: 'Bearer ' + CHURCH_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({ref: e.ref, lang: lang})});
+      var j = await r.json().catch(function(){ return {}; });
+      if (!r.ok || !j.ok || !(j.verses || []).length) throw new Error(j.detail || j.error || ('the Bible service answered ' + r.status));
+      var multi = j.verses.some(function(v){ return v.c !== j.verses[0].c; });
+      var items = j.verses.map(function(v, k){ return {v: (multi ? v.c + ':' : '') + v.v, role: roles[k % 2], alt: k % 2 === 1, t: v.t}; });
+      p.sections[i] = normalize({type: 'reading', title: e.label, ref: e.ref, note: e.note, items: items, per: 1, auto: {lang: lang, version: j.version, source: j.source}});
+    } catch (err) {
+      p.warnings.push(e.label + ' ' + e.ref + ': the verses could not be fetched (' + ((err && err.message) || err) + '). Type them in Edit slide.');
+    }
+  }
+  return p;
+}
+async function parseAnyFile(file){
   var n = file.name.toLowerCase();
   if (/\.docx$/.test(n)) {
     if (typeof JSZip === 'undefined') throw new Error('The Word reader could not load. Check the internet connection and reload the page.');
@@ -1732,10 +1783,10 @@ async function parseServiceFile(file){
 
 /* =================== Model helpers =================== */
 var CONG = /congregation|ruas|jemaat|people|all\b|semua/i;
-function paginate(items){
-  var pages = [], cur = [], len = 0;
+function paginate(items, per){
+  var pages = [], cur = [], len = 0, max = per > 0 ? per : 2;
   items.forEach(function(it){
-    if (cur.length && (cur.length >= 2 || len + it.t.length > 300)) { pages.push(cur); cur = []; len = 0; }
+    if (cur.length && (cur.length >= max || (max > 1 && len + it.t.length > 300))) { pages.push(cur); cur = []; len = 0; }
     cur.push(it); len += it.t.length;
   });
   if (cur.length) pages.push(cur);
@@ -1746,7 +1797,7 @@ function normalize(sec){
     if (!sec.items) sec.items = [].concat.apply([], sec.pages || []);
     sec.items.forEach(function(it){ it.alt = CONG.test(it.role || ''); });
     if (!sec.items.length) sec.items = [{v:'1', role:'Liturgist', alt:false, t:'Type the reading here.'}];
-    sec.pages = paginate(sec.items);
+    sec.pages = paginate(sec.items, sec.per);
     var roles = []; sec.items.forEach(function(it){ if (it.role && roles.indexOf(it.role) < 0) roles.push(it.role); });
     sec.legend = roles.length === 2 ? roles[0] + ' reads · ' + roles[1] + ' responds' : '';
   } else if (sec.type === 'hymn') {
@@ -1844,9 +1895,10 @@ var LANG_WORDS = {
   id: /\b(yang|dan|dengan|untuk|kita|kami|Tuhan|Allah|bernyanyi|berdiri|persembahan|ini|itu|akan|dalam|kepada|dari|tidak|semua|doa)\b/gi,
   en: /\b(the|and|of|to|we|our|lord|god|sing|stand|offering|you|is|in|with|for|all|prayer)\b/gi
 };
-function detectLang(){
-  var txt = [state.meta.sunday, state.meta.theme].join(' ');
-  state.sections.forEach(function(s){
+function detectLang(){ return langOfParsed(state.meta, state.sections); }
+function langOfParsed(meta, sections){
+  var txt = [(meta || {}).sunday, (meta || {}).theme].join(' ');
+  (sections || []).forEach(function(s){
     txt += ' ' + [s.title, s.ref, s.name, s.offering].join(' ');
     if (s.lines) txt += ' ' + s.lines.join(' ');
     if (s.items) s.items.forEach(function(it){ txt += ' ' + it.t + ' ' + it.role; });
@@ -2081,7 +2133,7 @@ function renderEditor(){
   } else if (sec.type === 'reading') {
     h = '<h3>Reading</h3>' + fld('Label', 's.title', sec.title) + fld('Reference', 's.ref', sec.ref) + fld('Note at the bottom (e.g. sermon theme)', 's.note', sec.note || '', {full: true}) +
         fld('Verses, one per line: 17 [Liturgist] text', 's.items', readingToText(sec), {area: true, full: true}) +
-        '<div class="hint full">Lines whose role is Congregation (or Ruas) are shown in gold. Slides are split automatically, about two verses each.</div>';
+        '<div class="hint full">Lines whose role is Congregation (Jemaat, Ruas) are shown in gold. Slides are split automatically, about two verses each; Epistel verses fetched from the Bible get one verse per slide.</div>';
   } else {
     var vi = curVi(), v = sec.verses[vi];
     h = '<h3>Hymn</h3>' + fld('Label', 's.title', sec.title) + fld('Hymn number and verses', 's.ref', sec.ref) +
@@ -2930,7 +2982,7 @@ function buildStandalone(){
     '<script>document.documentElement.className += \' js\';<\/script>\n' +
     '<style>[hidden]{display:none!important}html,body{height:100%;margin:0;background:' + ({advent:'#0e0f1c',olive:'#0f1410',sea:'#071219',ember:'#150c08',linen:'#f6f0e6'}[(data.look && data.look.theme) || 'classic'] || '#110d0c') + ';overflow:hidden}@supports (height:100dvh){.js .dk{height:100dvh}}' + STATIC_CSS + css + '</style>\n</head>\n<body>\n<div class="dk" id="deck"></div>\n' + staticHTML(data) + '\n' +
     '<script type="application/json" id="tata-data">' + json + '<\/script>\n' +
-    '<script>\n' + Presenter.toString() + '\nvar DECK = Presenter(document.getElementById("deck"), JSON.parse(document.getElementById("tata-data").textContent), {standalone: true});\n' +
+    '<script>\n' + framed.toString() + '\n' + frameFull.toString() + '\n' + Presenter.toString() + '\nvar DECK = Presenter(document.getElementById("deck"), JSON.parse(document.getElementById("tata-data").textContent), {standalone: true});\n' +
     '(function(){ var pages = document.querySelectorAll(".st .pg"); if (!pages.length) return;\n' +
     '  /* upright phone: the slide you scroll to is the one shown when you turn the phone sideways */\n' +
     '  if ("IntersectionObserver" in window) { var io = new IntersectionObserver(function(es){ es.forEach(function(en){ if (en.isIntersecting && getComputedStyle(document.querySelector(".st")).display !== "none") DECK.go(+en.target.getAttribute("data-i")); }); }, {rootMargin: "-45% 0px -45% 0px"}); pages.forEach(function(p){ io.observe(p); }); }\n' +
@@ -3445,7 +3497,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-27 · 10';
+var APP_VERSION = '2026-10-27 · 11';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
