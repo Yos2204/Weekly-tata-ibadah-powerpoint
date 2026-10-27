@@ -2932,6 +2932,14 @@ $('bPresent').onclick = async function(){
   catch(e){ setPresent(true); }
 };
 document.addEventListener('fullscreenchange', function(){ if (!document.fullscreenElement && presenting) setPresent(false); });
+// A preview opened without a tap (autopilot) fills the window; browsers allow true full screen only after a tap, so the first tap on the
+// slides switches to it (Android, computers) instead of turning the page. iPhone has no full screen for pages: the window view stays.
+document.addEventListener('click', function(e){
+  if (!presenting || document.fullscreenElement || !document.fullscreenEnabled || !$('deck').requestFullscreen) return;
+  if (!e.target.closest || !e.target.closest('#deck') || e.target.closest('button, a, input, select, .dk-bar, .dk-ov')) return;
+  e.stopPropagation(); e.preventDefault();
+  $('deck').requestFullscreen().then(function(){ try { navigator.wakeLock.request('screen').catch(function(){}); } catch(x){} }).catch(function(){});
+}, true);
 document.addEventListener('keydown', function(e){
   var tag = (e.target.tagName || '').toLowerCase(), typing = tag === 'input' || tag === 'textarea' || tag === 'select';
   if (!presenting && (e.ctrlKey || e.metaKey) && !typing) {
@@ -3442,9 +3450,11 @@ async function autoRun(localFile){
     rvEl('rvOut').innerHTML = 'OK saves <b>' + escH(autoInfo.outName) + '</b> in ' + escH(autoInfo.outFolder || autoInfo.folder) + '.';
     refreshReviewDeck();
     rvEl('rvOk').disabled = false;
-    // Jarvis "go": show the full-screen preview now (the review stays behind it, closing the preview returns to OK · save HTML)
-    if (ssGet('ti-go')) { ssSet('ti-go', ''); setTimeout(function(){ $('bPresent').click(); }, 300); setTimeout(goSend, 1500); }
-    // "Find it automatically" from the church folder (no Jarvis): the review stays, but the file still goes to the chairman the same way (YB 2026-10-27)
+    // every autopilot run opens the finished slides full screen right away, on iPhone, Android and computers (YB 2026-10-27:
+    // "it should be fullscreen preview after auto generate the slides"). The review stays behind it: closing the preview returns to OK · save HTML.
+    setTimeout(function(){ $('bPresent').click(); }, 300);
+    // Jarvis "go" and "Find it automatically" from the church folder also send the file to the chairman
+    if (ssGet('ti-go')) { ssSet('ti-go', ''); setTimeout(goSend, 1500); }
     else if (GO_FILE && GO_FILE.file === localFile && GO_SEND) setTimeout(goSend, 1500);
     step('spell', 'busy');
     rvSpell = await runSpellCheck(function(t){ rvEl('rvSpellNote').textContent = t; });
@@ -3569,7 +3579,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-27 · 12';
+var APP_VERSION = '2026-10-27 · 13';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
