@@ -391,6 +391,8 @@ label.f select{padding:7px 8px}
 .dk-body{flex:1;min-height:0;display:flex;gap:calc(3 * var(--u));align-items:center;position:relative}
 .dk-vnum{flex:none;font-family:var(--dk-display);font-weight:700;font-size:calc(13 * var(--u));line-height:.8;color:var(--dk-red);min-width:calc(9 * var(--u));text-align:center;white-space:nowrap}
 .dk-vnum.d2{font-size:calc(9.5 * var(--u))}.dk-vnum.d3{font-size:calc(7 * var(--u))}
+.dk-vnum small{display:block;font-family:var(--dk-text);font-style:normal;font-weight:700;font-size:calc(1.3 * var(--u));letter-spacing:.1em;color:var(--dk-ochre);line-height:1;margin-top:calc(1 * var(--u))}
+.dk[data-verse="stack"] .dk-vnum small{display:inline;margin:0 0 0 .5em;vertical-align:middle}
 .dk-row.plain{grid-template-columns:2.6em minmax(0,1fr)}
 .dk-row.plain .who i{margin:0;font-size:1.7em}
 .dk-fit{flex:1;min-width:0;max-height:100%;overflow:hidden;font-size:calc(4 * var(--u))}
@@ -765,13 +767,16 @@ function Presenter(root, DATA, OPTS){
   var slot = q('.dk-slot'), stage = q('.dk-stage'), bar = q('.dk-bar');
   var slides = [], idx = 0, loop = DATA.autoRepeat !== false, live = !!OPTS.standalone;
   root.classList.toggle('live', live);
+  var VS = function(sec){ return sec.slides || sec.verses; };   // hymn slides: long verses spill over to extra slides
+  var vLabel = function(v){ return v.label != null ? v.label : v.n; };
+  var partMark = function(v){ return v.parts > 1 ? '<small>' + v.part + ' / ' + v.parts + '</small>' : ''; };
 
   function build(){
     slides = [];
     DATA.sections.forEach(function(sec, si){
       if (sec.skip) return;
-      var n = sec.type === 'hymn' ? sec.verses.length : sec.type === 'reading' ? sec.pages.length : 1;
-      for (var k = 0; k < n; k++) slides.push({si: si, vi: k});
+      var vs = sec.type === 'hymn' ? VS(sec) : null, n = vs ? vs.length : sec.type === 'reading' ? sec.pages.length : 1;
+      for (var k = 0; k < n; k++) slides.push({si: si, vi: k, ki: vs ? (vs[k].k != null ? vs[k].k : k) : k});
     });
   }
   function firstOf(si){ for (var i = 0; i < slides.length; i++) if (slides[i].si === si) return i; return -1; }
@@ -848,7 +853,7 @@ function Presenter(root, DATA, OPTS){
           '<div class="dk-body"><div class="dk-fit"><div class="dk-reading">' + rows + '</div></div></div>' +
           '</div>';
     } else {
-      var v = sec.verses[s.vi];
+      var v = VS(sec)[s.vi];
       var lines = v.lines.map(function(l){ return '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join('');
       var en = DATA.commands === 'en', ct = v.cue === 'stand' ? (en || !v.cueText ? 'Please stand' : v.cueText) : v.cue === 'music' ? (en || !v.cueText ? 'Music' : v.cueText) : (v.cueText || (v.cue && v.cue !== 'note' ? v.cue : ''));
       var cue = !v.cue && !v.cueText ? '' : '<div class="dk-cue">' + (v.cue === 'stand' ? UP : v.cue === 'music' ? '♪ ' : '') + esc(ct) + '</div>';
@@ -856,7 +861,7 @@ function Presenter(root, DATA, OPTS){
       var qrHtml = showQr ? '<figure class="dk-qr"><div class="dk-qr-card"><img src="' + qr.src + '" alt="Offering QR code"></div>' + ((qr.caption || word('give')) ? '<figcaption>' + esc(qr.caption || word('give')) + '</figcaption>' : '') + '</figure>' : '';
       h = '<div class="dk-slide' + (showQr ? ' has-qr' : '') + '"><div class="dk-head"><div><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b>' + (sec.ref ? ' · ' + esc(sec.ref) : '') + '</div>' +
           '<div class="dk-title">' + esc(sec.name) + '</div></div>' + (sec.offering ? '<span class="dk-chip">' + esc(sec.offering) + '</span>' : '') + '</div>' +
-          '<div class="dk-body' + (cue ? ' has-cue' : '') + '">' + cue + '<div class="dk-vnum' + (String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.n) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
+          '<div class="dk-body' + (cue ? ' has-cue' : '') + '">' + cue + '<div class="dk-vnum' + (String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.n) + partMark(v) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
           '</div>';
     }
     slot.innerHTML = h;
@@ -923,7 +928,7 @@ function Presenter(root, DATA, OPTS){
     var s = slides[idx], sec = DATA.sections[s.si];
     q('.count').textContent = (idx + 1) + ' / ' + slides.length;
     var pel = q('.dk-pel'), isOff = sec.type === 'hymn' && !!sec.offering;
-    var list = sec.type === 'hymn' ? sec.verses.map(function(x){ return x.n; }) : sec.type === 'reading' ? sec.pages.map(function(p){ return p[0].v || ''; }) : [];
+    var list = sec.type === 'hymn' ? VS(sec).map(vLabel) : sec.type === 'reading' ? sec.pages.map(function(p){ return p[0].v || ''; }) : [];
     pel.hidden = list.length < 2 && !isOff;
     if (!pel.hidden) {
       pel.querySelector('.lbl').textContent = isOff ? sec.offering : sec.type === 'hymn' ? 'Verse' : 'Page';
@@ -944,9 +949,9 @@ function Presenter(root, DATA, OPTS){
     if (sec.type === 'part') return {head: 'Order of Service', name: plainT(sec.title), pos: '', text: ''};
     if (sec.type === 'text') return {head: plainT(sec.title), name: plainT(sec.lines[0]), pos: '', text: sec.lines.slice(1).map(plainT).join(' / ')};
     if (sec.type === 'reading') return {head: plainT(sec.title), name: plainT(sec.ref), pos: 'Page ' + (s.vi + 1) + ' of ' + sec.pages.length, text: sec.pages[s.vi].map(function(x){ return x.v + ' ' + plainT(x.t); }).join('\n')};
-    var v = sec.verses[s.vi];
+    var v = VS(sec)[s.vi];
     return {head: plainT(sec.title) + (sec.ref ? ' · ' + plainT(sec.ref) : '') + (sec.offering ? ' · ' + plainT(sec.offering) : ''), name: plainT(sec.name),
-      pos: 'Verse ' + v.n + ' (' + (s.vi + 1) + ' of ' + sec.verses.length + ')' + (v.cueText ? ' · ' + v.cueText : v.cue === 'stand' ? ' · Please stand' : v.cue === 'music' ? ' · Music' : ''),
+      pos: 'Verse ' + v.n + (v.parts > 1 ? ' part ' + v.part + ' of ' + v.parts : '') + ' (' + (s.vi + 1) + ' of ' + VS(sec).length + ')' + (v.cueText ? ' · ' + v.cueText : v.cue === 'stand' ? ' · Please stand' : v.cue === 'music' ? ' · Music' : ''),
       text: v.lines.map(function(l){ return plainT(l.t); }).join('\n')};
   }
   function openPresenter(){
@@ -996,7 +1001,7 @@ function Presenter(root, DATA, OPTS){
       set('h2', nx ? nx.head : 'End of the slideshow'); set('n2', nx ? nx.name : ''); set('p2', nx ? nx.pos : ''); set('t2', nx ? nx.text : '');
       set('nn', ni >= 0 && ni <= idx ? '↺ Next goes back to verse 1 (offering repeats). Press N to move on.' : '');
       set('h0', pv ? pv.head : 'Nothing yet'); set('n0', pv ? pv.name : ''); set('p0', pv ? pv.pos : ''); set('t0', pv ? pv.text : '');
-      var list = sec.type === 'hymn' ? sec.verses.map(function(x){ return x.n; }) : sec.type === 'reading' ? sec.pages.map(function(p){ return p[0].v || ''; }) : [];
+      var list = sec.type === 'hymn' ? VS(sec).map(vLabel) : sec.type === 'reading' ? sec.pages.map(function(p){ return p[0].v || ''; }) : [];
       d.getElementById('vs').innerHTML = list.length > 1 ? list.map(function(n, k){ return '<button data-k="' + k + '" class="' + (k === s.vi ? 'on' : '') + '">' + esc(n || k + 1) + '</button>'; }).join('') : '';
       d.getElementById('v1').hidden = sec.type !== 'hymn';
     } catch (e) {}
@@ -1010,9 +1015,9 @@ function Presenter(root, DATA, OPTS){
   function next(){ var n = nextIndex(); if (n >= 0) go(n); }
   function prev(){ go(idx - 1); }
   function verse(k){ var s = slides[idx], sec = DATA.sections[s.si];
-    var n = sec.type === 'hymn' ? sec.verses.length : sec.type === 'reading' ? sec.pages.length : 1; if (k < n) go(firstOf(s.si) + k); }
+    var n = sec.type === 'hymn' ? VS(sec).length : sec.type === 'reading' ? sec.pages.length : 1; if (k < n) go(firstOf(s.si) + k); }
   function verseNo(num){ var sec = DATA.sections[slides[idx].si];
-    if (sec.type === 'hymn') { for (var k = 0; k < sec.verses.length; k++) if (String(sec.verses[k].n) === String(num)) return verse(k); }
+    if (sec.type === 'hymn') { var vs = VS(sec); for (var k = 0; k < vs.length; k++) if (String(vs[k].n) === String(num)) return verse(k); }
     verse(num - 1); }
   function exitSec(){ go(lastOf(slides[idx].si) + 1); }
   function toggleBlack(){ var b = q('.dk-black'); b.hidden = !b.hidden; }
@@ -1029,7 +1034,7 @@ function Presenter(root, DATA, OPTS){
       else if (sec.type === 'reading') { small = sec.title; name = sec.ref;
         btns = sec.pages.map(function(p, k){ return '<button data-go="' + (f + k) + '" class="' + (idx === f + k ? 'on' : '') + '">' + esc(p[0].v) + (p.length > 1 ? '–' + esc(p[p.length - 1].v) : '') + '</button>'; }).join(''); }
       else { small = sec.title + (sec.ref ? ' · ' + sec.ref : ''); name = sec.name;
-        btns = sec.verses.map(function(v, k){ return '<button data-go="' + (f + k) + '" class="' + (idx === f + k ? 'on' : '') + '">' + esc(v.n) + '</button>'; }).join(''); }
+        btns = VS(sec).map(function(v, k){ return '<button data-go="' + (f + k) + '" class="' + (idx === f + k ? 'on' : '') + '">' + esc(vLabel(v)) + '</button>'; }).join(''); }
       if (!btns) btns = '<button data-go="' + f + '" class="' + (idx === f ? 'on' : '') + '">Open</button>';
       return '<div class="s' + (si === cur ? ' cur' : '') + '"><div><small>' + esc(small) + '</small><span>' + esc(name) + '</span>' + (sec.offering ? '<em>' + esc(sec.offering) + '</em>' : '') + '</div><div class="go">' + btns + '</div></div>';
     }).join('');
@@ -1783,9 +1788,74 @@ async function parseAnyFile(file){
 
 /* =================== Model helpers =================== */
 var CONG = /congregation|ruas|jemaat|people|all\b|semua/i;
+/* spill-over (YB 2026-10-27): a Bible verse or hymn verse that is too long for one slide is spread
+   evenly over two or more slides (5a, 5b … for readings; a hymn verse keeps its number with "1 / 2").
+   The limits are what still reads comfortably on a phone held sideways and on a laptop. */
+var SPILL = {chars: 280, lines: 6, lineChars: 72};
+function partLabel(v, k, parts){ if (parts < 2) return v; var a = 'abcdefghij'[k] || String(k + 1); return String(v || '') + (/[a-z]$/i.test(String(v || '')) ? '·' : '') + a; }
+function splitTextEven(t, parts){
+  t = String(t || '').trim(); if (parts < 2) return [t];
+  var toks = t.match(/[^.;:!?,]+[.;:!?,]*["”’)]*\s*/g) || [t];   // clauses first …
+  if (toks.length < parts) toks = t.match(/\S+\s*/g) || [t];            // … words when there are too few clauses
+  var total = t.length, out = [], cur = '', ti = 0;
+  for (var g = 1; g < parts; g++) {
+    var ideal = total * g / parts, done = out.join('').length;
+    while (ti < toks.length - (parts - g)) {                               // keep at least one piece for each later slide
+      var now = done + cur.length, withTok = now + toks[ti].length;
+      if (cur && Math.abs(withTok - ideal) >= Math.abs(now - ideal)) break;
+      cur += toks[ti++];
+    }
+    out.push(cur); cur = '';
+  }
+  out.push(toks.slice(ti).join(''));
+  return out.map(function(x){ return x.trim(); }).filter(Boolean);
+}
+function spillItems(items){
+  var out = [];
+  items.forEach(function(it){
+    var t = String(it.t || ''), parts = Math.ceil(t.length / SPILL.chars);
+    if (parts < 2) { out.push(it); return; }
+    var bits = splitTextEven(t, parts);
+    bits.forEach(function(b, k){ out.push({v: partLabel(it.v, k, bits.length), role: it.role, alt: it.alt, t: b, part: k + 1, parts: bits.length, src: it}); });
+  });
+  return out;
+}
+function hymnSlides(verses){
+  var out = [], REF = typeof MARK_REF !== 'undefined' ? MARK_REF : /^\s*(?:reff?|refrain|koor|chorus)\b/i;
+  (verses || []).forEach(function(v, k){
+    var lines = v.lines || [];
+    // the refrain (Reff) always stays together on one slide: group it as one unit that is never cut
+    var units = [], cur = null, inRef = false;
+    lines.forEach(function(l){
+      if (REF.test(String(l.t || ''))) { cur = {ref: true, lines: [l]}; units.push(cur); inRef = true; return; }   // "Reff:" … to the end of the verse
+      if (inRef || (l.ref && cur && cur.ref)) { cur.lines.push(l); return; }                                      // marked refrain lines stay together
+      cur = {ref: !!l.ref, lines: [l]}; units.push(cur);
+    });
+    if (units.length === 1 && units[0].ref) units = lines.map(function(l){ return {ref: false, lines: [l]}; });   // the whole verse repeated is not a refrain
+    var w = units.map(function(u){ return u.lines.reduce(function(a, l){ return a + Math.max(1, Math.ceil(String(l.t || '').length / SPILL.lineChars)); }, 0); });
+    var W = w.reduce(function(a, b){ return a + b; }, 0), parts = Math.min(Math.ceil(W / SPILL.lines), units.length);
+    if (parts < 2) { out.push({n: v.n, label: String(v.n), cue: v.cue, cueText: v.cueText, lines: lines, k: k, part: 1, parts: 1}); return; }
+    var pre = [0]; w.forEach(function(x){ pre.push(pre[pre.length - 1] + x); });
+    var cuts = [0], last = 0;
+    for (var g = 1; g < parts; g++) {
+      var ideal = W * g / parts, best = -1, bestScore = 1e9;
+      for (var i = last + 1; i <= units.length - (parts - g); i++) {
+        var score = Math.abs(pre[i] - ideal) - (units[i].ref ? 1.4 : 0);   // a cut right before the refrain is preferred
+        if (score < bestScore) { bestScore = score; best = i; }
+      }
+      cuts.push(best); last = best;
+    }
+    cuts.push(units.length);
+    for (var c = 0; c < parts; c++) {
+      var ls = [].concat.apply([], units.slice(cuts[c], cuts[c + 1]).map(function(u){ return u.lines; }));
+      out.push({n: v.n, label: partLabel(v.n, c, parts), cue: c ? null : v.cue, cueText: c ? '' : v.cueText, lines: ls, k: k, part: c + 1, parts: parts});
+    }
+  });
+  return out;
+}
 function paginate(items, per){
   var pages = [], cur = [], len = 0, max = per > 0 ? per : 2;
-  items.forEach(function(it){
+  spillItems(items).forEach(function(it){
     if (cur.length && (cur.length >= max || (max > 1 && len + it.t.length > 300))) { pages.push(cur); cur = []; len = 0; }
     cur.push(it); len += it.t.length;
   });
@@ -1802,6 +1872,7 @@ function normalize(sec){
     sec.legend = roles.length === 2 ? roles[0] + ' reads · ' + roles[1] + ' responds' : '';
   } else if (sec.type === 'hymn') {
     if (!sec.verses || !sec.verses.length) sec.verses = [{n:1, cue:null, lines:[{t:''}]}];
+    sec.slides = hymnSlides(sec.verses);
     sec.title = sec.title || ''; sec.ref = sec.ref || ''; sec.name = sec.name || ''; sec.offering = sec.offering || '';
   } else if (sec.type === 'text') {
     if (!sec.lines || !sec.lines.length) sec.lines = [''];
@@ -1920,7 +1991,7 @@ var store = {
   del: function(k){ try { localStorage.removeItem('wb5-' + k); } catch(e){} }
 };
 function escH(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-function deckData(){ return {lang: resolvedLang(), qr: state.qr, autoRepeat: true, gstyle: state.gstyle, look: currentLook(), meta: state.meta, sections: state.sections, bg: typeof deckBg === 'function' && bgList.length ? deckBg() : {}, key: state.fileName, transition: state.transition, bold: state.bold, commands: state.commands}; }
+function deckData(){ state.sections.forEach(normalize); return {lang: resolvedLang(), qr: state.qr, autoRepeat: true, gstyle: state.gstyle, look: currentLook(), meta: state.meta, sections: state.sections, bg: typeof deckBg === 'function' && bgList.length ? deckBg() : {}, key: state.fileName, transition: state.transition, bold: state.bold, commands: state.commands}; }
 
 var undoStack = [], redoStack = [];
 function snap(){ return JSON.stringify({gstyle: state.gstyle, bold: state.bold, meta: state.meta, sections: state.sections, transition: state.transition, idx: deck ? deck.index : 0}); }
@@ -1956,7 +2027,7 @@ function refresh(opt){
   saveDraft();
 }
 function curSi(){ var s = deck.slides[deck.index]; return s ? s.si : 0; }
-function curVi(){ var s = deck.slides[deck.index]; return s ? s.vi : 0; }
+function curVi(){ var s = deck.slides[deck.index]; return s ? (s.ki != null ? s.ki : s.vi) : 0; }   // the verse being edited (a long verse may take two slides)
 function goSection(si, vi){ var f = deck.firstOf(si); if (f >= 0) deck.go(f + (vi || 0)); }
 
 /* =================== Loading =================== */
@@ -2061,7 +2132,7 @@ function renderOutline(){
     else if (sec.type === 'reading') { name = sec.ref; small = sec.title + ' · ' + sec.pages.length + ' slide' + (sec.pages.length > 1 ? 's' : '');
       if (f >= 0) btns = sec.pages.map(function(p, k){ return '<button data-go="' + (f + k) + '" class="' + (deck.index === f + k ? 'on' : '') + '">' + escH(p[0].v || k + 1) + '</button>'; }).join(''); }
     else { name = sec.name; small = sec.title + ' · ' + sec.ref;
-      if (f >= 0) btns = sec.verses.map(function(v, k){ return '<button data-go="' + (f + k) + '" class="' + (deck.index === f + k ? 'on' : '') + '" title="Verse ' + escH(v.n) + (v.cue ? ' (' + (v.cue === 'stand' ? 'please stand' : 'music') + ')' : '') + '">' + escH(v.n) + '</button>'; }).join(''); }
+      if (f >= 0) btns = (sec.slides || sec.verses).map(function(v, k){ return '<button data-go="' + (f + k) + '" class="' + (deck.index === f + k ? 'on' : '') + '" title="Verse ' + escH(v.n) + (v.parts > 1 ? ' (part ' + v.part + ' of ' + v.parts + ')' : '') + (v.cue ? ' (' + (v.cue === 'stand' ? 'please stand' : 'music') + ')' : '') + '">' + escH(v.label != null ? v.label : v.n) + '</button>'; }).join(''); }
     if (!btns) btns = f >= 0 ? '<button data-go="' + f + '" class="' + (deck.index === f ? 'on' : '') + '">Show</button>' : '<span class="hint">Skipped</span>';
     return '<div class="sec' + (si === cur && f >= 0 ? ' cur' : '') + (sec.skip ? ' skipped' : '') + '">' +
       '<span class="kind' + (sec.type === 'hymn' ? ' hymn' : '') + '">' + kind + '</span>' +
@@ -2133,7 +2204,7 @@ function renderEditor(){
   } else if (sec.type === 'reading') {
     h = '<h3>Reading</h3>' + fld('Label', 's.title', sec.title) + fld('Reference', 's.ref', sec.ref) + fld('Note at the bottom (e.g. sermon theme)', 's.note', sec.note || '', {full: true}) +
         fld('Verses, one per line: 17 [Liturgist] text', 's.items', readingToText(sec), {area: true, full: true}) +
-        '<div class="hint full">Lines whose role is Congregation (Jemaat, Ruas) are shown in gold. Slides are split automatically, about two verses each; Epistel verses fetched from the Bible get one verse per slide.</div>';
+        '<div class="hint full">Lines whose role is Congregation (Jemaat, Ruas) are shown in gold. Slides are split automatically, about two verses each; Epistel verses fetched from the Bible get one verse per slide. A verse too long for one slide spills over evenly onto the next (5a, 5b).</div>';
   } else {
     var vi = curVi(), v = sec.verses[vi];
     h = '<h3>Hymn</h3>' + fld('Label', 's.title', sec.title) + fld('Hymn number and verses', 's.ref', sec.ref) +
@@ -2148,7 +2219,8 @@ function renderEditor(){
         fld('Verse number', 'v.n', v.n) +
         fld('Cue on this verse', 'v.cue', v.cue || '', {select: [['', 'None'], ['stand', 'Stand (arrow icon)'], ['music', 'Music (note icon)'], ['note', 'Other instruction']]}) +
         fld('Cue wording on the slide (as in the document)', 'v.cueText', v.cueText || '', {full: true}) +
-        fld('Lines (put “> ” before a refrain line)', 'v.lines', verseToText(v), {area: true, full: true});
+        fld('Lines (put “> ” before a refrain line)', 'v.lines', verseToText(v), {area: true, full: true}) +
+        (sec.slides && sec.slides.some(function(x){ return x.k === vi && x.parts > 1; }) ? '<div class="hint full">This verse is long, so it is spread evenly over ' + sec.slides.filter(function(x){ return x.k === vi; }).length + ' slides (marked 1 / 2, 2 / 2). Shorten or split the verse to change that.</div>' : '');
   }
   h += '<h3>Background</h3>' + fld('Picture behind this section', 'b.bg', sec.bg || '', {select: [['', 'Automatic (from the Backgrounds panel)'], ['none', 'No picture']].concat(bgList.map(function(b){ return [b.id, b.name]; })), full: true});
   ed.innerHTML = h;
@@ -2929,8 +3001,8 @@ function staticHTML(data){
       return;
     }
     var showQr = sec.offering && qr.src && qr.show !== false && sec.qr !== false;
-    sec.verses.forEach(function(v){
-      page(si, 'vr' + (showQr ? ' hq' : ''), head() + '<div class="bd"><div class="vn">' + e(v.n) + cueText(v) + '</div><div class="ly">' +
+    (sec.slides || sec.verses).forEach(function(v){
+      page(si, 'vr' + (showQr ? ' hq' : ''), head() + '<div class="bd"><div class="vn">' + e(v.n) + (v.parts > 1 ? '<small>' + v.part + ' / ' + v.parts + '</small>' : '') + cueText(v) + '</div><div class="ly">' +
         v.lines.map(function(l){ return '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join('') + '</div>' + (showQr ? qrBox : '') + '</div>');
     });
   });
@@ -2955,7 +3027,7 @@ var STATIC_CSS = 'html:not(.js),html:not(.js) body{height:auto;overflow:auto}htm
   '.pg .th{font:italic 500 20px/1.3 Alegreya,Georgia,serif;color:#dcae63;margin:6px 0}.pg .sm{color:#b7ab9b;letter-spacing:.06em;margin:8px 0 0;font-weight:500}' +
   '.pg h2{font:italic 700 22px/1.2 Alegreya,Georgia,serif;margin:2px 0 10px}.pg header{border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:10px}' +
   '.st .ey{margin:0;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#b7ab9b}.st .ey b{color:#ec7a69}.st .chip{background:#dcae63;color:#1a110c;border-radius:4px;padding:1px 6px;letter-spacing:.06em;white-space:nowrap}' +
-  '.bd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}.bd .ly p{margin:0 0 5px;padding-left:1em;text-indent:-1em}.vn{font:700 30px/1 Alegreya,Georgia,serif;color:#e0503f;display:flex;flex-direction:column;gap:6px;align-items:flex-start}' +
+  '.bd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}.bd .ly p{margin:0 0 5px;padding-left:1em;text-indent:-1em}.vn{font:700 30px/1 Alegreya,Georgia,serif;color:#e0503f;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.vn small{font:700 11px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;color:#d9a441}' +
   '.cue{font:700 11px "Alegreya Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ec7a69;border:1px solid currentColor;border-radius:3px;padding:1px 5px}' +
   '.st .ref{font-style:italic;color:#dcae63}.rv{margin:0 0 10px;padding-left:1.6em;text-indent:-1.6em}.rv .n{color:#e0503f;margin-right:8px}.rv .who{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b7ab9b}.rv.alt{color:#dcae63}' +
   '.qr{grid-column:1/-1;margin:8px 0 0;display:flex;align-items:center;gap:12px}.qri{width:38%;max-width:170px;aspect-ratio:1;background:#fff center/86% no-repeat;border-radius:10px;outline:2px solid #dcae63;outline-offset:3px}' +
@@ -3072,7 +3144,7 @@ function slideTexts(){
     if (sec.type === 'part') out.push({t: sec.title, si: si, vi: 0, where: plain(sec.title)});
     else if (sec.type === 'text') { out.push({t: sec.title, si: si, vi: 0, where: plain(sec.title)}); sec.lines.forEach(function(l){ out.push({t: l, si: si, vi: 0, where: plain(sec.title)}); }); }
     else if (sec.type === 'reading') sec.pages.forEach(function(pg, vi){ pg.forEach(function(it){ out.push({t: it.t, si: si, vi: vi, where: plain(sec.title) + ' ' + (it.v || '')}); }); });
-    else if (sec.type === 'hymn') { out.push({t: sec.name, si: si, vi: 0, where: name}); sec.verses.forEach(function(v, vi){ v.lines.forEach(function(l){ out.push({t: l.t, si: si, vi: vi, where: name + ' · verse ' + v.n}); }); }); }
+    else if (sec.type === 'hymn') { out.push({t: sec.name, si: si, vi: 0, where: name}); (sec.slides || sec.verses).forEach(function(v, vi){ v.lines.forEach(function(l){ out.push({t: l.t, si: si, vi: vi, where: name + ' · verse ' + (v.label != null ? v.label : v.n)}); }); }); }
   });
   return out;
 }
@@ -3497,7 +3569,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-27 · 11';
+var APP_VERSION = '2026-10-27 · 12';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
