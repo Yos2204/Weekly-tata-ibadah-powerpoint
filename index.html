@@ -521,8 +521,8 @@ label.f select{padding:7px 8px}
 .dk.portrait .dk-qr{width:calc(34 * var(--u));align-self:center}
 .dk.portrait .has-qr .dk-body{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);align-items:start;column-gap:calc(3 * var(--u))}
 .dk.portrait .has-qr .dk-vnum{grid-column:1;grid-row:1;align-self:end}
-.dk.portrait .has-qr .dk-qr{grid-column:2;grid-row:1;width:calc(24 * var(--u));gap:calc(1 * var(--u))}
-.dk.portrait .has-qr .dk-qr figcaption{font-size:calc(1.6 * var(--u))}
+.dk.portrait .has-qr .dk-qr{grid-column:2;grid-row:1;width:calc(17 * var(--u));gap:calc(.7 * var(--u));align-self:start}
+.dk.portrait .has-qr .dk-qr figcaption{font-size:calc(1.3 * var(--u));letter-spacing:.06em}
 .dk.portrait .has-qr .dk-fit{grid-column:1 / -1;grid-row:2;height:100%;max-height:100%}
 .dk.portrait .has-qr .dk-cue{left:0;right:auto;top:0}
 .dk.portrait .dk-row,.dk.portrait .dk-row.plain{grid-template-columns:minmax(0,1fr)}
@@ -3701,7 +3701,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-31 · 17';
+var APP_VERSION = '2026-10-31 · 18';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
