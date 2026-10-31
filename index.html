@@ -32,7 +32,11 @@
   var mark = "wb.ok." + String(tok).slice(0, 12);
   fetch(URL_, { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_token: tok }) })
     .then(function (r) { return r.json(); })
-    .then(function (ok) { if (ok === true) { try { localStorage.setItem(mark, String(Date.now())); } catch (e) {} pass(); } else block(); })
+    .then(function (ok) { if (ok === true) { try { localStorage.setItem(mark, String(Date.now())); } catch (e) {} pass();
+      // live key (YB 2026-10-30): written into every exported presentation so it can go live by itself on the service day
+      fetch(URL_.replace("hk_wb_access", "hk_live_key_issue"), { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_token: tok }) })
+        .then(function (r) { return r.ok ? r.json() : null; }).then(function (k) { if (typeof k === "string" && k.length >= 32) { window.SADA_LIVE_KEY = k; try { localStorage.setItem("wb.livekey", k); } catch (e) {} } }).catch(function () {});
+    } else block(); })
     .catch(function () { // offline: allow a maker who was checked on this phone in the last 7 days
       var t = 0; try { t = +localStorage.getItem(mark) || 0; } catch (e) {}
       if (Date.now() - t < 7 * 864e5) pass(); else block();
@@ -342,7 +346,7 @@ label.f select{padding:7px 8px}
 .dk[data-titles="soft"] .dk-theme{font-style:normal}
 /* verse layouts */
 .dk[data-verse="stack"] .dk-body{flex-direction:column;align-items:stretch;gap:calc(.6 * var(--u))}
-.dk[data-verse="stack"] .dk-vnum{font-size:calc(4.2 * var(--u));text-align:left;min-width:0;line-height:1;color:var(--dk-ochre)}
+.dk[data-verse="stack"] .dk-vnum{font-size:calc(4.2 * var(--u));text-align:left;min-width:0;line-height:1;color:var(--dk-bone)}
 .dk[data-verse="stack"] .dk-vnum::before{content:"Ayat ";font-family:var(--dk-text);font-weight:700;font-size:.45em;letter-spacing:.14em;text-transform:uppercase;vertical-align:middle;color:var(--dk-bone-dim)}
 .dk[data-verse="stack"][data-lang="en"] .dk-vnum::before{content:"Verse "}
 .dk[data-verse="stack"] .dk-qr{align-self:flex-end;position:absolute;right:0;bottom:0;width:calc(15 * var(--u))}
@@ -391,14 +395,14 @@ label.f select{padding:7px 8px}
 .dk-body{flex:1;min-height:0;display:flex;gap:calc(3 * var(--u));align-items:center;position:relative}
 .dk-vnum{flex:none;font-family:var(--dk-display);font-weight:700;font-size:calc(13 * var(--u));line-height:.8;color:var(--dk-red);min-width:calc(9 * var(--u));text-align:center;white-space:nowrap}
 .dk-vnum.d2{font-size:calc(9.5 * var(--u))}.dk-vnum.d3{font-size:calc(7 * var(--u))}
-.dk-vnum small{display:block;font-family:var(--dk-text);font-style:normal;font-weight:700;font-size:calc(1.3 * var(--u));letter-spacing:.1em;color:var(--dk-ochre);line-height:1;margin-top:calc(1 * var(--u))}
+.dk-vnum small{display:block;font-family:var(--dk-text);font-style:normal;font-weight:700;font-size:calc(1.3 * var(--u));letter-spacing:.1em;color:var(--dk-bone);line-height:1;margin-top:calc(1 * var(--u))}
 .dk[data-verse="stack"] .dk-vnum small{display:inline;margin:0 0 0 .5em;vertical-align:middle}
 .dk-row.plain{grid-template-columns:2.6em minmax(0,1fr)}
 .dk-row.plain .who i{margin:0;font-size:1.7em}
 .dk-fit{flex:1;min-width:0;max-height:100%;overflow:hidden;font-size:calc(4 * var(--u))}
 .dk-lyric{display:flex;flex-direction:column;gap:.38em}
 .dk-lyric p{margin:0;font-weight:500;line-height:1.22;text-wrap:balance}
-.dk-lyric p.ref{font-style:italic;color:var(--dk-ochre)}
+.dk-lyric p.ref{font-style:normal;color:inherit}
 /* the stand / music cue sits above the words, never on top of them */
 .dk-body.has-cue .dk-fit{box-sizing:border-box;padding-top:calc(3.4 * var(--u))}
 /* auto indentation: a line too long for one row continues indented under its first word */
@@ -408,7 +412,19 @@ label.f select{padding:7px 8px}
 .dk-qr{flex:none;width:calc(21 * var(--u));margin:0;display:flex;flex-direction:column;align-items:center;gap:calc(.9 * var(--u));align-self:center}
 .dk-qr-card{width:100%;background:#fff;border-radius:calc(1 * var(--u));padding:calc(1.1 * var(--u));box-shadow:0 calc(.6 * var(--u)) calc(2.4 * var(--u)) rgba(0,0,0,.45);box-sizing:border-box;outline:calc(.25 * var(--u)) solid var(--dk-ochre);outline-offset:calc(.5 * var(--u))}
 .dk-qr-card img{display:block;width:100%;height:auto}
-.dk-qr figcaption{font-weight:700;font-size:calc(1.45 * var(--u));letter-spacing:.12em;text-wrap:balance;max-width:100%;text-transform:uppercase;color:var(--dk-ochre);text-align:center;line-height:1.3}
+.dk-qr-card{outline-color:var(--dk-bone)!important}
+.dk-rtag{align-self:flex-start;margin-top:.45em;font-family:var(--dk-text);font-weight:800;font-size:.4em;letter-spacing:.18em;text-transform:uppercase;color:var(--dk-bone);border:.12em solid currentColor;border-radius:.4em;padding:.25em .6em;line-height:1;opacity:.9}
+.dk-al-center .dk-rtag{align-self:center}.dk-al-right .dk-rtag,.dk[data-verse="right"] .dk-rtag{align-self:flex-end}
+/* the Reff slide: labelled REFF in the verse-number place, in the slide's own text colour (no yellow) */
+.dk-vnum.reff{font-family:var(--dk-text);font-size:calc(3.2 * var(--u));letter-spacing:.14em;text-transform:uppercase;color:var(--dk-bone);line-height:1;border:calc(.3 * var(--u)) solid currentColor;border-radius:calc(.8 * var(--u));padding:calc(.9 * var(--u)) calc(1.2 * var(--u));min-width:0;align-self:flex-start}
+/* the offering QR on its own large slide (about twice the size of the QR beside the lyrics) */
+.dk-qrslide{flex-direction:row;align-items:center;justify-content:center;gap:calc(5 * var(--u))}
+.dk-qrslide .dk-qr{width:calc(37 * var(--u));flex:none;margin:0;align-self:center}
+.dk-qrtext{display:flex;flex-direction:column;gap:calc(1.4 * var(--u));max-width:calc(38 * var(--u))}
+.dk-qrtext .dk-title{font-size:calc(4.4 * var(--u));line-height:1.1}
+.dk-qrcap{margin:calc(1 * var(--u)) 0 0;font-weight:800;font-size:calc(2.6 * var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--dk-bone);line-height:1.25}
+.dk-qrcap::before{content:"\2190  ";font-size:1.1em}
+.dk-qr figcaption{font-weight:700;font-size:calc(1.45 * var(--u));letter-spacing:.12em;text-wrap:balance;max-width:100%;text-transform:uppercase;color:var(--dk-bone);text-align:center;line-height:1.3}
 .has-qr .dk-cue{right:calc(24 * var(--u))}
 .has-qr .dk-vnum{min-width:calc(7 * var(--u))}
 .dk-cue{position:absolute;top:0;right:0;display:flex;align-items:center;gap:calc(.6 * var(--u));font-weight:700;text-transform:uppercase;letter-spacing:.12em;font-size:calc(1.5 * var(--u));color:var(--dk-red-soft);border:calc(.14 * var(--u)) solid currentColor;border-radius:calc(.3 * var(--u));padding:calc(.35 * var(--u)) calc(.9 * var(--u))}
@@ -427,7 +443,6 @@ label.f select{padding:7px 8px}
 .dk-text .dk-big{font-size:calc(calc(5 * var(--u)) * var(--dk-scale,1))}
 .dk:not([data-mode="light"]):not([data-look="linen"]) .dk-slide{text-shadow:0 .05em .3em rgba(0,0,0,.65)}
 .dk:not([data-mode="light"]):not([data-look="linen"]) .dk-theme,
-.dk:not([data-mode="light"]):not([data-look="linen"]) .dk-lyric p.ref,
 .dk:not([data-mode="light"]):not([data-look="linen"]) .dk-row.alt p,
 .dk:not([data-mode="light"]):not([data-look="linen"]) .dk-row.alt .who{color:color-mix(in srgb,var(--dk-ochre) 40%,#fff)}
 .dk-theme{font-weight:600}
@@ -776,6 +791,9 @@ function Presenter(root, DATA, OPTS){
     DATA.sections.forEach(function(sec, si){
       if (sec.skip) return;
       var vs = sec.type === 'hymn' ? VS(sec) : null, n = vs ? vs.length : sec.type === 'reading' ? sec.pages.length : 1;
+      // the offering hymn opens with a large QR slide when the offering QR code is on (YB 2026-10-29)
+      var bigQr = sec.type === 'hymn' && sec.offering && DATA.qr && DATA.qr.src && DATA.qr.show !== false && sec.qr !== false;
+      if (bigQr) slides.push({si: si, vi: 0, ki: 0, qrSlide: true});
       for (var k = 0; k < n; k++) slides.push({si: si, vi: k, ki: vs ? (vs[k].k != null ? vs[k].k : k) : k});
     });
   }
@@ -852,16 +870,21 @@ function Presenter(root, DATA, OPTS){
       h = '<div class="dk-slide"><div class="dk-head"><div><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b></div><div class="dk-title">' + esc(sec.ref) + '</div></div></div>' +
           '<div class="dk-body"><div class="dk-fit"><div class="dk-reading">' + rows + '</div></div></div>' +
           '</div>';
+    } else if (s.qrSlide) {
+      var qq = DATA.qr || {};
+      h = '<div class="dk-slide dk-qrslide"><figure class="dk-qr"><div class="dk-qr-card"><img src="' + qq.src + '" alt="Offering QR code"></div></figure>' +
+          '<div class="dk-qrtext"><div class="dk-eyebrow"><b>' + esc(sec.offering || sec.title) + '</b></div><div class="dk-title">' + esc(sec.name || sec.ref) + '</div>' +
+          ((qq.caption || word('give')) ? '<p class="dk-qrcap">' + esc(qq.caption || word('give')) + '</p>' : '') + '</div></div>';
     } else {
       var v = VS(sec)[s.vi];
-      var lines = v.lines.map(function(l){ return '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join('');
+      var tagged = false, lines = v.lines.map(function(l){ var tag = !v.ref && l.ref && !tagged ? (tagged = true, '<div class="dk-rtag">Reff</div>') : ''; return tag + '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join('');
       var en = DATA.commands === 'en', ct = v.cue === 'stand' ? (en || !v.cueText ? 'Please stand' : v.cueText) : v.cue === 'music' ? (en || !v.cueText ? 'Music' : v.cueText) : (v.cueText || (v.cue && v.cue !== 'note' ? v.cue : ''));
       var cue = !v.cue && !v.cueText ? '' : '<div class="dk-cue">' + (v.cue === 'stand' ? UP : v.cue === 'music' ? '♪ ' : '') + esc(ct) + '</div>';
       var qr = DATA.qr || {}, showQr = !!(sec.offering && qr.src && qr.show !== false && sec.qr !== false);
       var qrHtml = showQr ? '<figure class="dk-qr"><div class="dk-qr-card"><img src="' + qr.src + '" alt="Offering QR code"></div>' + ((qr.caption || word('give')) ? '<figcaption>' + esc(qr.caption || word('give')) + '</figcaption>' : '') + '</figure>' : '';
       h = '<div class="dk-slide' + (showQr ? ' has-qr' : '') + '"><div class="dk-head"><div><div class="dk-eyebrow"><b>' + esc(sec.title) + '</b>' + (sec.ref ? ' · ' + esc(sec.ref) : '') + '</div>' +
           '<div class="dk-title">' + esc(sec.name) + '</div></div>' + (sec.offering ? '<span class="dk-chip">' + esc(sec.offering) + '</span>' : '') + '</div>' +
-          '<div class="dk-body' + (cue ? ' has-cue' : '') + '">' + cue + '<div class="dk-vnum' + (String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.n) + partMark(v) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
+          '<div class="dk-body' + (cue ? ' has-cue' : '') + '">' + cue + '<div class="dk-vnum' + (v.ref ? ' reff' : String(v.n).length > 2 ? ' d3' : String(v.n).length > 1 ? ' d2' : '') + '">' + esc(v.ref ? 'Reff' : v.n) + partMark(v) + '</div><div class="dk-fit"><div class="dk-lyric">' + lines + '</div></div>' + qrHtml + '</div>' +
           '</div>';
     }
     slot.innerHTML = h;
@@ -1180,7 +1203,7 @@ function cellParas(tc){
 /* a song that arrives lumped together (one verse of more than 8 lines, e.g. no verse numbers, only line breaks)
    is split into slides: at ♪♪ music breaks, at Reff / Refrain, at blank lines and -Musik- style cues, then after
    sentence-ending lines, about 4 lines per slide and never more than 6. Each slide keeps its verse number. */
-var MARK_MUSIC = /^[♪♫♩\s]+$/, MARK_REF = /^\[?\s*(?:reff?|refrain|koor|chorus)\b\s*\.?\s*\]?\s*:?\s*/i;
+var MARK_MUSIC = /^[♪♫♩\s]+$/, MARK_REF = /^\[?\s*(?:reff?|refrein|refrain|koor|chorus)\s*(?:\.?\s*\]?\s*:|\.|\]|$)\s*/i;   // a real label only ("Reff:", "[Reff]", "Reff."), never a lyric that starts with the word
 /* long part of a song: break after lines that end a sentence (. ! ?), about 4 lines per slide, never more than 6 */
 function chunkLines(lines){
   if (lines.length <= 6) return [lines];
@@ -1228,6 +1251,52 @@ function splitLumped(verses){
     if (out.length - before > 1) count++;
   });
   return {verses: out, split: count};
+}
+/* ---- song structure (YB 2026-10-29) ----
+   A song that arrives as one block (no list numbering) is split into its verses and its Reff, in this order:
+   1. "Reff" after every verse: equal verse+Reff blocks, checked against EVERY Reff marker (a wrong guess is never used);
+   2. a Reff printed once: the heading's verse count gives the verse length, and the Reff is sung after every verse;
+   3. blank lines or cues (-Berdiri-, -Musik-) between verses, as many as the heading says;
+   4. the heading's verse count splits the lines evenly ("KJ No. 4: 1-3" = 3 verses).
+   If none fits, null: the older guessing below is used and the maker is asked to check. Reff lines are kept with ref:true. */
+function structureSong(plain, spec){
+  var V = spec ? spec.length : 0, items = [], cue = null, reffNext = false, gap = false;
+  plain.forEach(function(x){
+    if (x.cue) { cue = x.cue; gap = true; return; }
+    var t = String(x.t || '').trim(); if (!t) { gap = true; return; }
+    if (MARK_MUSIC.test(t)) { cue = {type: 'music', text: 'Musik'}; gap = true; return; }
+    var ref = false, rm = MARK_REF.exec(t);
+    if (rm) { ref = true; t = t.slice(rm[0].length).trim(); if (!t) { reffNext = true; return; } }
+    if (reffNext) { ref = true; reffNext = false; }
+    items.push({t: t, reffStart: ref, cue: cue, gap: gap || !!x.gap}); cue = null; gap = false;
+  });
+  var N = items.length; if (!N) return null;
+  var R = []; items.forEach(function(x, i){ if (x.reffStart) R.push(i); });
+  var blocks = null, make = function(a, b, ref){ return {ref: ref, items: items.slice(a, b)}; };
+  if (R.length >= 2 && R[0] > 0 && N % R.length === 0) {
+    var per = N / R.length, v = R[0];
+    if (per - v > 0 && R.every(function(p, i){ return p === v + i * per; })) {
+      blocks = []; for (var i = 0; i < R.length; i++) { blocks.push(make(i * per, i * per + v, false)); blocks.push(make(i * per + v, (i + 1) * per, true)); }
+    }
+  }
+  if (!blocks && R.length === 1 && V > 1 && R[0] > 0) {
+    var v1 = R[0], k = N - V * v1;
+    if (k > 0) { var rf = make(v1, v1 + k, true); blocks = [make(0, v1, false), rf];
+      for (var j = 1; j < V; j++) { blocks.push(make(v1 + k + (j - 1) * v1, v1 + k + j * v1, false)); blocks.push(rf); } }
+  }
+  if (!blocks && !R.length) {
+    var starts = [0]; items.forEach(function(x, i){ if (i && (x.gap || x.cue)) starts.push(i); });
+    if (starts.length > 1 && starts.length === V) blocks = starts.map(function(st, i){ return make(st, i + 1 < starts.length ? starts[i + 1] : N, false); });
+  }
+  if (!blocks && !R.length && V > 1 && N % V === 0) { var pv = N / V; blocks = []; for (var q = 0; q < V; q++) blocks.push(make(q * pv, (q + 1) * pv, false)); }
+  if (!blocks) return null;
+  var verses = [];
+  blocks.forEach(function(b){
+    if (b.ref) { var last = verses[verses.length - 1]; if (last) b.items.forEach(function(x){ last.lines.push({t: x.t, ref: true}); }); return; }
+    var c = null; b.items.forEach(function(x){ if (x.cue && !c) c = x.cue; });
+    verses.push({n: spec && spec[verses.length] != null ? spec[verses.length] : verses.length + 1, cue: c ? c.type : null, cueText: c ? c.text : '', lines: b.items.map(function(x){ return {t: x.t}; })});
+  });
+  return verses;
 }
 function verseSpec(ref){
   var m = /:\s*([\d\s,–—\-]+)\s*$/.exec(ref || ''); if (!m) return null;
@@ -1411,8 +1480,9 @@ function buildService(headers, rawRows, fileName, source){
         if (p.numbered || m || !verses.length) { verses.push({n: m ? +m[1] : null, cue: pending ? pending.type : null, cueText: pending ? pending.text : '', lines: [{t: m ? m[2] : p.t}]}); pending = null; brk = null; }
         else { var ln = {t: p.t}; if (p.gap) ln.gap = true; if (brk) { ln.cue = brk; pending = null; brk = null; } verses[verses.length - 1].lines.push(ln); }
       });
-      var spec = verseSpec(ref);
-      if (!anyNum && spec && spec.length > 1 && verses.length === 1) {
+      var spec = verseSpec(ref), structured = !anyNum ? structureSong(plain, spec) : null;
+      if (structured && structured.length) verses = structured;
+      else if (!anyNum && spec && spec.length > 1 && verses.length === 1) {
         // no numbering survived (old .doc): split at cue markers, otherwise into equal parts
         var segs = [[]], cues = [null];
         plain.forEach(function(x){ if (x.cue) { if (segs[segs.length - 1].length) { segs.push([]); cues.push(null); } cues[cues.length - 1] = x.cue; } else segs[segs.length - 1].push(x.t); });
@@ -1429,7 +1499,7 @@ function buildService(headers, rawRows, fileName, source){
         if (v.n == null) v.n = spec && spec.length === verses.length ? spec[k] : (spec && spec.length === 1 ? spec[0] + k : k + 1);
       });
       if (anyNum && spec && spec.length !== verses.length) warnings.push(label + ' ' + ref + ': found ' + verses.length + ' verse(s), the reference lists ' + spec.length + '. Check the numbering.');
-      var lump = splitLumped(verses); verses = lump.verses;
+      var lump = structured ? {verses: verses, split: 0} : splitLumped(verses); verses = lump.verses;   // a structured song needs no guessing
       if (lump.split) warnings.push(label + ' ' + ref + ': the song came as one long block, so it was split into ' + verses.length + ' slides at its music breaks, refrain and sentence ends. Check them in Edit slide.');
       if (verses.length > 1) {
         var key = function(t){ return t.toLowerCase().replace(/[.,]\s*$/, ''); };
@@ -1820,39 +1890,41 @@ function spillItems(items){
   });
   return out;
 }
+/* hymn slides (YB 2026-10-29): each verse on its own slide(s), the Reff on its own slide(s) labelled "Reff" (a short verse and a
+   short Reff share one slide when they fit neatly: verse up to 4 lines, Reff up to 4, together up to 6, with a small REFF tag),
+   never more than 6 lines on a slide (a longer part is split evenly: 7 = 4+3, 8 = 4+4, 9 = 5+4, 12 = 6+6).
+   The "Reff:" word itself is not shown in the lyrics, because the slide is labelled Reff. */
 function hymnSlides(verses){
-  var out = [], REF = typeof MARK_REF !== 'undefined' ? MARK_REF : /^\s*(?:reff?|refrain|koor|chorus)\b/i;
+  var out = [], REF = typeof MARK_REF !== 'undefined' ? MARK_REF : /^\s*(?:reff?|refrain|koor|chorus)\b\s*:?\s*/i, MAX = 6;
+  var even = function(ls){ if (ls.length <= MAX) return [ls]; var parts = Math.ceil(ls.length / MAX), r = [], i = 0; for (var p = 0; p < parts; p++) { var size = Math.ceil((ls.length - i) / (parts - p)); r.push(ls.slice(i, i + size)); i += size; } return r; };
   (verses || []).forEach(function(v, k){
-    var lines = v.lines || [];
-    // the refrain (Reff) always stays together on one slide: group it as one unit that is never cut
-    var units = [], cur = null, inRef = false;
-    lines.forEach(function(l){
-      if (REF.test(String(l.t || ''))) { cur = {ref: true, lines: [l]}; units.push(cur); inRef = true; return; }   // "Reff:" … to the end of the verse
-      if (inRef || (l.ref && cur && cur.ref)) { cur.lines.push(l); return; }                                      // marked refrain lines stay together
-      cur = {ref: !!l.ref, lines: [l]}; units.push(cur);
+    var groups = [], inRef = false;
+    (v.lines || []).forEach(function(l){
+      var t = String(l.t || ''), m = REF.exec(t), isRef = !!l.ref || inRef || !!m;
+      if (m) { inRef = true; t = t.slice(m[0].length).trim(); if (!t) return; }   // "Reff:" … to the end of the verse
+      var g = groups[groups.length - 1];
+      if (!g || g.ref !== isRef) { g = {ref: isRef, lines: []}; groups.push(g); }
+      g.lines.push(isRef ? {t: t, ref: true} : {t: t});
     });
-    if (units.length === 1 && units[0].ref) units = lines.map(function(l){ return {ref: false, lines: [l]}; });   // the whole verse repeated is not a refrain
-    var w = units.map(function(u){ return u.lines.reduce(function(a, l){ return a + Math.max(1, Math.ceil(String(l.t || '').length / SPILL.lineChars)); }, 0); });
-    var W = w.reduce(function(a, b){ return a + b; }, 0), parts = Math.min(Math.ceil(W / SPILL.lines), units.length);
-    if (parts < 2) { out.push({n: v.n, label: String(v.n), cue: v.cue, cueText: v.cueText, lines: lines, k: k, part: 1, parts: 1}); return; }
-    var pre = [0]; w.forEach(function(x){ pre.push(pre[pre.length - 1] + x); });
-    var cuts = [0], last = 0;
-    for (var g = 1; g < parts; g++) {
-      var ideal = W * g / parts, best = -1, bestScore = 1e9;
-      for (var i = last + 1; i <= units.length - (parts - g); i++) {
-        var score = Math.abs(pre[i] - ideal) - (units[i].ref ? 1.4 : 0);   // a cut right before the refrain is preferred
-        if (score < bestScore) { bestScore = score; best = i; }
-      }
-      cuts.push(best); last = best;
+    if (!groups.length) groups = [{ref: false, lines: [{t: ''}]}];
+    if (groups.length === 1 && groups[0].ref) { groups[0].ref = false; groups[0].lines = groups[0].lines.map(function(l){ return {t: l.t}; }); }   // the whole verse repeated is not a refrain
+    // a short verse with a short Reff after it: one tidy slide (verse, a small REFF tag, then the Reff), when together at most 6 lines
+    if (groups.length === 2 && !groups[0].ref && groups[1].ref && groups[0].lines.length <= 4 && groups[1].lines.length <= 4 && groups[0].lines.length + groups[1].lines.length <= MAX) {
+      out.push({n: v.n, label: String(v.n), cue: v.cue, cueText: v.cueText, lines: groups[0].lines.concat(groups[1].lines), k: k, part: 1, parts: 1, withReff: true});
+      return;
     }
-    cuts.push(units.length);
-    for (var c = 0; c < parts; c++) {
-      var ls = [].concat.apply([], units.slice(cuts[c], cuts[c + 1]).map(function(u){ return u.lines; }));
-      out.push({n: v.n, label: partLabel(v.n, c, parts), cue: c ? null : v.cue, cueText: c ? '' : v.cueText, lines: ls, k: k, part: c + 1, parts: parts});
-    }
+    var verseParts = groups.filter(function(g){ return !g.ref; }).reduce(function(n, g){ return n + even(g.lines).length; }, 0), vp = 0;
+    groups.forEach(function(g, gi){
+      even(g.lines).forEach(function(ls, i, arr){
+        if (g.ref) out.push({n: v.n, label: 'Reff', ref: true, cue: null, cueText: '', lines: ls, k: k, part: arr.length > 1 ? i + 1 : 1, parts: arr.length});
+        else { out.push({n: v.n, label: partLabel(v.n, vp, verseParts), cue: vp ? null : v.cue, cueText: vp ? '' : v.cueText, lines: ls, k: k, part: vp + 1, parts: verseParts}); vp++; }
+      });
+    });
   });
+  // the offering hymn starts with a large QR slide (it is shown only when the offering QR code is on)
   return out;
 }
+
 function paginate(items, per){
   var pages = [], cur = [], len = 0, max = per > 0 ? per : 2;
   spillItems(items).forEach(function(it){
@@ -3010,8 +3082,8 @@ function staticHTML(data){
     }
     var showQr = sec.offering && qr.src && qr.show !== false && sec.qr !== false;
     (sec.slides || sec.verses).forEach(function(v){
-      page(si, 'vr' + (showQr ? ' hq' : ''), head() + '<div class="bd"><div class="vn">' + e(v.n) + (v.parts > 1 ? '<small>' + v.part + ' / ' + v.parts + '</small>' : '') + cueText(v) + '</div><div class="ly">' +
-        v.lines.map(function(l){ return '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join('') + '</div>' + (showQr ? qrBox : '') + '</div>');
+      page(si, 'vr' + (showQr ? ' hq' : ''), head() + '<div class="bd"><div class="vn' + (v.ref ? ' reff' : '') + '">' + e(v.ref ? 'Reff' : v.n) + (v.parts > 1 ? '<small>' + v.part + ' / ' + v.parts + '</small>' : '') + cueText(v) + '</div><div class="ly">' +
+        (function(){ var tg = false; return v.lines.map(function(l){ var tag = !v.ref && l.ref && !tg ? (tg = true, '<span class="rtag">Reff</span>') : ''; return tag + '<p' + (l.ref ? ' class="ref"' : '') + '>' + rich(l.t) + '</p>'; }).join(''); })() + '</div>' + (showQr ? qrBox : '') + '</div>');
     });
   });
   var lib = (data.bg && data.bg.lib) || {}, blur = Math.round(((data.bg && data.bg.blur) || 0) * .8), dim = ((data.bg && data.bg.dim != null) ? data.bg.dim : 55) / 100;
@@ -3019,7 +3091,7 @@ function staticHTML(data){
     olive: ['#f0f1e6','#18201a','#5e9a5a','#9fd39b','#e4c06a','#a7b19b','#0f1410'], sea: ['#eaf4f7','#0e1e28','#2aa9c2','#7fd7ea','#f0c87a','#8fb0bd','#071219'],
     ember: ['#fbefe3','#231410','#e8702a','#ffa36b','#ffd27a','#c7a48d','#150c08'], linen: ['#2a1d16','#ebe2d3','#a8261b','#a8261b','#7c4f12','#6f5f52','#f6f0e6']};
   var lk = LK[(data.look && data.look.theme) || 'classic'] || LK.classic;
-  var css = '.st{color:' + lk[0] + '}.pg{background:' + lk[1] + '}.pin{border-top-color:' + lk[2] + '}.pg .th,.st .ref,.qr figcaption{color:' + lk[4] + '}.pg .sm,.st .ey{color:' + lk[5] + '}.st .ey b,.cue{color:' + lk[3] + '}.rv .n{color:' + lk[2] + '}' +
+  var css = '.st{color:' + lk[0] + '}.pg{background:' + lk[1] + '}.pin{border-top-color:' + lk[2] + '}.pg .th{color:' + lk[4] + '}.st .ref,.qr figcaption{color:' + lk[0] + '}.pg .sm,.st .ey{color:' + lk[5] + '}.st .ey b,.cue{color:' + lk[3] + '}.rv .n{color:' + lk[2] + '}' +
     (data.look && data.look.theme === 'linen' ? '.bgi::after{background:rgba(246,240,230,' + dim + ')!important}' : '') +
     Object.keys(usedBgIds).map(function(id){ return '.bg-' + id + '::before{background-image:url(' + lib[id] + ')}'; }).join('') +
     '.bgi::before{filter:blur(' + blur + 'px)}.bgi::after{background:rgba(17,13,12,' + dim + ')}' + (qr.src ? '.qri{background-image:url(' + qr.src + ')}' : '');
@@ -3037,9 +3109,10 @@ var STATIC_CSS = 'html:not(.js),html:not(.js) body{height:auto;overflow:auto}htm
   '.st .ey{margin:0;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#b7ab9b}.st .ey b{color:#ec7a69}.st .chip{background:#dcae63;color:#1a110c;border-radius:4px;padding:1px 6px;letter-spacing:.06em;white-space:nowrap}' +
   '.bd{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start}.bd .ly p{margin:0 0 5px;padding-left:1em;text-indent:-1em}.vn{font:700 30px/1 Alegreya,Georgia,serif;color:#e0503f;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.vn small{font:700 11px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;color:#d9a441}' +
   '.cue{font:700 11px "Alegreya Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ec7a69;border:1px solid currentColor;border-radius:3px;padding:1px 5px}' +
-  '.st .ref{font-style:italic;color:#dcae63}.rv{margin:0 0 10px;padding-left:1.6em;text-indent:-1.6em}.rv .n{color:#e0503f;margin-right:8px}.rv .who{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b7ab9b}.rv.alt{color:#dcae63}' +
-  '.qr{grid-column:1/-1;margin:8px 0 0;display:flex;align-items:center;gap:12px}.qri{width:38%;max-width:170px;aspect-ratio:1;background:#fff center/86% no-repeat;border-radius:10px;outline:2px solid #dcae63;outline-offset:3px}' +
-  '.qr figcaption{color:#dcae63;font-size:13px;letter-spacing:.1em;text-transform:uppercase}' +
+  '.st .ref{font-style:normal;color:inherit}.rv{margin:0 0 10px;padding-left:1.6em;text-indent:-1.6em}.rv .n{color:#e0503f;margin-right:8px}.rv .who{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#b7ab9b}.rv.alt{color:#dcae63}' +
+  '.qr{grid-column:1/-1;margin:12px 0 0;display:flex;flex-direction:column;align-items:center;gap:10px}.qri{width:min(92%,440px);aspect-ratio:1;background:#fff center/88% no-repeat;border-radius:14px;outline:3px solid #f3ece1;outline-offset:4px}' +
+  '.ly .rtag{display:inline-block;margin:8px 0 6px;font:800 11px/1 "Alegreya Sans",sans-serif;letter-spacing:.16em;text-transform:uppercase;border:1.5px solid currentColor;border-radius:5px;padding:4px 7px;opacity:.9}' +
+  '.qr figcaption{color:inherit;font-size:15px;letter-spacing:.1em;text-transform:uppercase;text-align:center}.vn.reff{font:700 13px/1 "Alegreya Sans",sans-serif;letter-spacing:.14em;text-transform:uppercase;border:2px solid currentColor;border-radius:6px;padding:5px 7px;color:inherit}' +
   '.st .hint{color:#8d8177;font-size:13px;font-weight:500;text-align:center;margin:18px 8px}' +
   /* phones in a browser: upright shows the list, sideways shows the slideshow */
   '@media (max-width:760px) and (orientation:portrait){html.js,.js body{height:auto;overflow:auto}.js .st{display:block}.js .dk{display:none}.js .st .hint{display:none}}' +
@@ -3047,8 +3120,50 @@ var STATIC_CSS = 'html:not(.js),html:not(.js) body{height:auto;overflow:auto}htm
   '@media (orientation:landscape) and (max-height:600px){html:not(.js){scroll-snap-type:y mandatory}html:not(.js) .st{max-width:none;padding:0}' +
   'html:not(.js) .pg{height:100vh;height:100svh;margin:0;border-radius:0;scroll-snap-align:start;display:flex;align-items:center}html:not(.js) .pin{width:100%;box-sizing:border-box;padding:4vh 6vw;border-top-width:1.2vh}' +
   'html:not(.js) .pg h1{font-size:9vh}html:not(.js) .pg .th{font-size:6vh}html:not(.js) .pg h2{font-size:6vh}html:not(.js) .st .ey{font-size:3.2vh}' +
-  'html:not(.js) .bd{grid-template-columns:auto minmax(0,1fr) auto;font-size:5.4vh}html:not(.js) .vn{font-size:14vh}html:not(.js) .qr{grid-column:auto;flex-direction:column;width:30vh;margin:0}' +
+  'html:not(.js) .bd{grid-template-columns:auto minmax(0,1fr) auto;font-size:5.4vh}html:not(.js) .vn{font-size:14vh}html:not(.js) .qr{grid-column:auto;flex-direction:column;width:62vh;margin:0}' +
   'html:not(.js) .qri{width:100%;max-width:none}html:not(.js) .rd{font-size:4.6vh}html:not(.js) .st .hint{display:none}}';
+
+/* Live to members' phones (YB 2026-10-30): the downloaded file sends the slide on screen to Sada with the church's live code.
+   Inside Sada (in a frame) it stays quiet: Sada broadcasts there itself. */
+function sadaLiveKey(){ try { return window.SADA_LIVE_KEY || localStorage.getItem("wb.livekey") || ""; } catch (e) { return window.SADA_LIVE_KEY || ""; } }
+function liveCast(KEYED){
+  if (window.parent !== window) return;
+  var API = "https://tbicfofdorwrupzlqgdm.supabase.co/rest/v1/rpc/", KEY = "sb_publishable_9vk_cadCXY8pt597XKqdSA_DSoYKZDt";
+  var mode = KEYED ? "auto" : "off", last = "", first = null, timer = null, code = "", quietUntil = 0;
+  try { code = localStorage.getItem("sadaLiveCode") || ""; } catch (e) {}
+  var b = document.createElement("button"); b.type = "button"; b.id = "sadaLive";
+  b.setAttribute("style", "position:fixed;left:12px;bottom:12px;z-index:99999;border:0;border-radius:999px;padding:8px 14px;font:700 13px/1 Arial,sans-serif;color:#fff;background:rgba(0,0,0,.45);opacity:.35;cursor:pointer;transition:opacity .2s");
+  var st = document.createElement("style"); st.textContent = "@media print{#sadaLive{display:none!important}}"; document.head.appendChild(st); document.body.appendChild(b);
+  function show(){ var t = { auto: "📡 Live otomatis", live: "🔴 LIVE", paused: "⏸ Live dijeda", outside: "📡 Live di hari ibadah", off: "📡 Live" }[mode];
+    b.textContent = t; b.style.background = mode === "live" ? "#d92d20" : "rgba(0,0,0,.45)"; b.style.opacity = mode === "live" || mode === "paused" ? 1 : .35; }
+  b.onmouseenter = function(){ b.style.opacity = 1; }; b.onmouseleave = function(){ show(); };
+  function call(fn, body){ return fetch(API + fn, { method: "POST", headers: { "content-type": "application/json", apikey: KEY }, body: JSON.stringify(body) })
+    .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error((j && (j.message || j.hint)) || ("HTTP " + r.status)); return j; }); }); }
+  function vis(e){ var s = getComputedStyle(e); return s.display !== "none" && s.visibility !== "hidden" && +s.opacity > 0.05; }
+  function cur(){ var best = null, ba = 0, vw = innerWidth, vh = innerHeight, els = document.querySelectorAll(".dk-slide, section.pg");
+    for (var i = 0; i < els.length; i++) { var e = els[i], r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || !vis(e)) continue;
+      var w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)), h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0)); if (w * h > ba) { ba = w * h; best = e; } }
+    return best; }
+  function text(){ var c = cur(); return c ? (c.innerText || "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000) : ""; }
+  function send(t){
+    if (KEYED) return call("hk_live_cast_key", { p_key: KEYED, p_body: t }).then(function(r){ if (r && r.live === false) { mode = "outside"; quietUntil = Date.now() + 5 * 60e3; } else if (mode !== "paused") mode = "live"; show(); });
+    return call("hk_live_cast", { p_code: code, p_body: t }); }
+  function tick(){
+    var t = text(); if (!t) return; if (first === null) { first = t; return; }
+    if (mode === "paused" || mode === "off") return;
+    if (mode === "outside" && Date.now() < quietUntil) return;
+    if (t === first && mode === "auto") return;           // goes live from the first slide change, not just from opening the file
+    if (t !== last) { last = t; send(t).catch(function(err){ var m = String(err && err.message || err); if (/bad_key|bad_code/.test(m)) { mode = "off"; show(); } }); }
+  }
+  b.addEventListener("click", function(e){ e.stopPropagation();
+    if (mode === "live") { if (confirm("Jeda siaran live ke HP jemaat?")) { mode = "paused"; show(); if (KEYED) call("hk_live_cast_key_stop", { p_key: KEYED }).catch(function(){}); else if (code) call("hk_live_cast_stop", { p_code: code }).catch(function(){}); } return; }
+    if (mode === "paused" || mode === "outside" || mode === "auto") { mode = KEYED ? "auto" : "off"; last = ""; quietUntil = 0; first = first === null ? null : "\u0000"; show(); if (KEYED) return; }
+    if (!KEYED) {   // files made before this update: the one-time code, as before
+      if (!code) { code = (prompt("Kode live Sada (6 angka) — ada di Sada: Jadwal → Roster → Multimedia → Tata Ibadah") || "").replace(/\D/g, ""); if (code.length !== 6) { code = ""; return; } }
+      call("hk_live_cast", { p_code: code, p_body: "" }).then(function(){ try { localStorage.setItem("sadaLiveCode", code); } catch (e) {} mode = "live"; last = ""; show(); }).catch(function(){ try { localStorage.removeItem("sadaLiveCode"); } catch (e) {} code = ""; alert("Kode live salah."); });
+    } });
+  show(); timer = setInterval(tick, 800);
+}
 
 function buildStandalone(){
   var data = deckData(), css = $('deck-css').textContent, used = usedBg(), lib = {};
@@ -3069,7 +3184,7 @@ function buildStandalone(){
     '  pages.forEach(function(p){ p.addEventListener("click", function(){ DECK.go(+p.getAttribute("data-i")); }); });\n' +
     '  var lastPortrait = null; function onTurn(){ var portrait = matchMedia("(max-width:760px) and (orientation:portrait)").matches; if (portrait && lastPortrait === false) { var pg = document.querySelector(\'.st .pg[data-i="\' + DECK.index + \'"]\'); if (pg) pg.scrollIntoView({block: "start"}); } lastPortrait = portrait; }\n' +
     '  window.addEventListener("resize", onTurn); onTurn();\n' +
-    '})();\n<\/script>\n</body>\n</html>\n';
+    '})();\n<\/script>\n<script>(' + liveCast.toString() + ')(' + JSON.stringify(sadaLiveKey()) + ');<\/script>\n</body>\n</html>\n';
 }
 $('bSave').onclick = function(){ saveFile(state.fileName + '.html', new Blob([buildStandalone()], {type: 'text/html'}), $('saveStatus')); };
 
@@ -3579,7 +3694,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-27 · 13';
+var APP_VERSION = '2026-10-31 · 14';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
