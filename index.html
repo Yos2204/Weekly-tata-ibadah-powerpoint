@@ -349,8 +349,8 @@ label.f select{padding:7px 8px}
 .dk[data-verse="stack"] .dk-vnum{font-size:calc(4.2 * var(--u));text-align:left;min-width:0;line-height:1;color:var(--dk-bone)}
 .dk[data-verse="stack"] .dk-vnum::before{content:"Ayat ";font-family:var(--dk-text);font-weight:700;font-size:.45em;letter-spacing:.14em;text-transform:uppercase;vertical-align:middle;color:var(--dk-bone-dim)}
 .dk[data-verse="stack"][data-lang="en"] .dk-vnum::before{content:"Verse "}
-.dk[data-verse="stack"] .dk-qr{align-self:flex-end;position:absolute;right:0;bottom:0;width:calc(15 * var(--u))}
-.dk[data-verse="stack"] .has-qr .dk-fit{padding-right:calc(17 * var(--u))}
+.dk[data-verse="stack"] .dk-qr{align-self:flex-end;position:absolute;right:0;bottom:0;width:calc(21 * var(--u))}
+.dk[data-verse="stack"] .has-qr .dk-fit{padding-right:calc(24 * var(--u))}
 .dk[data-verse="right"] .dk-body{flex-direction:row-reverse}
 .dk[data-verse="right"] .dk-lyric{text-align:right;align-items:flex-end}
 .dk[data-verse="right"] .dk-head{flex-direction:row-reverse;text-align:right}
@@ -420,17 +420,19 @@ label.f select{padding:7px 8px}
 /* the offering QR on its own large slide (about twice the size of the QR beside the lyrics) */
 .dk-qrslide{flex-direction:row;align-items:center;justify-content:center;gap:calc(5 * var(--u))}
 .dk-qrslide .dk-qr{width:calc(37 * var(--u));flex:none;margin:0;align-self:center}
-.dk-qrtext{display:flex;flex-direction:column;gap:calc(1.4 * var(--u));max-width:calc(38 * var(--u))}
-.dk-qrtext .dk-title{font-size:calc(4.4 * var(--u));line-height:1.1}
-.dk-qrcap{margin:calc(1 * var(--u)) 0 0;font-weight:800;font-size:calc(2.6 * var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--dk-bone);line-height:1.25}
+.dk-qrtext{display:flex;flex-direction:column;gap:calc(1.4 * var(--u));width:calc(23 * var(--u));max-width:calc(23 * var(--u))}
+.dk-qrtext .dk-title{font-size:calc(3.9 * var(--u));line-height:1.12;overflow-wrap:break-word}
+.dk-qrcap{margin:calc(1 * var(--u)) 0 0;font-weight:800;font-size:calc(2.1 * var(--u));letter-spacing:.08em;text-transform:uppercase;color:var(--dk-bone);line-height:1.25}
 .dk-qrcap::before{content:"\2190  ";font-size:1.1em}
-/* upright phone: QR and text stay side by side, both shrunk to fit the screen width */
+.dk[data-verse="stack"] .dk-qrslide .dk-qr{position:static;width:calc(37 * var(--u));align-self:center}
+/* QR proportions use the golden ratio (1 : 1.618): on the QR slide the QR is the larger part (37u QR : 23u text, 60% : 38% on phones);
+   on song slides the lyrics lead and the QR is about 0.38 of the lyric width (21u beside about 54u of lyrics; 17u on phones) */
 .dk.portrait .dk-qrslide{gap:calc(2.5 * var(--u));padding-left:calc(2 * var(--u));padding-right:calc(2 * var(--u));box-sizing:border-box}
-.dk.portrait .dk-qrslide .dk-qr{width:54%;flex:none}
-.dk.portrait .dk-qrtext{flex:1 1 0;min-width:0;max-width:none;gap:calc(1 * var(--u))}
-.dk.portrait .dk-qrtext .dk-eyebrow{font-size:calc(1.6 * var(--u));letter-spacing:.08em}
-.dk.portrait .dk-qrtext .dk-title{font-size:calc(4 * var(--u));overflow-wrap:break-word}
-.dk.portrait .dk-qrcap{font-size:calc(1.6 * var(--u));letter-spacing:.04em;overflow-wrap:break-word}
+.dk.portrait .dk-qrslide .dk-qr{width:60%;flex:none}
+.dk.portrait .dk-qrtext{flex:1 1 0;min-width:0;width:auto;max-width:none;gap:calc(1 * var(--u))}
+.dk.portrait .dk-qrtext .dk-eyebrow{font-size:calc(1.5 * var(--u));letter-spacing:.06em}
+.dk.portrait .dk-qrtext .dk-title{font-size:calc(2.9 * var(--u));overflow-wrap:break-word}
+.dk.portrait .dk-qrcap{font-size:calc(1.5 * var(--u));letter-spacing:.03em;overflow-wrap:break-word}
 .dk-qr figcaption{font-weight:700;font-size:calc(1.45 * var(--u));letter-spacing:.12em;text-wrap:balance;max-width:100%;text-transform:uppercase;color:var(--dk-bone);text-align:center;line-height:1.3}
 .has-qr .dk-cue{right:calc(24 * var(--u))}
 .has-qr .dk-vnum{min-width:calc(7 * var(--u))}
@@ -521,10 +523,11 @@ label.f select{padding:7px 8px}
 .dk.portrait .dk-qr{width:calc(34 * var(--u));align-self:center}
 .dk.portrait .has-qr .dk-body{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);align-items:start;column-gap:calc(3 * var(--u))}
 .dk.portrait .has-qr .dk-vnum{grid-column:1;grid-row:1;align-self:end}
-.dk.portrait .has-qr .dk-qr{grid-column:2;grid-row:1;width:calc(24 * var(--u));gap:calc(1 * var(--u))}
-.dk.portrait .has-qr .dk-qr figcaption{font-size:calc(1.6 * var(--u))}
+.dk.portrait .has-qr .dk-qr{grid-column:2;grid-row:1;width:calc(17 * var(--u));gap:calc(.7 * var(--u));align-self:start}
+.dk.portrait .has-qr .dk-qr figcaption{font-size:calc(1.3 * var(--u));letter-spacing:.06em}
 .dk.portrait .has-qr .dk-fit{grid-column:1 / -1;grid-row:2;height:100%;max-height:100%}
 .dk.portrait .has-qr .dk-cue{left:0;right:auto;top:0}
+.dk.portrait[data-verse="stack"] .has-qr .dk-fit{padding-right:0}
 .dk.portrait .dk-row,.dk.portrait .dk-row.plain{grid-template-columns:minmax(0,1fr)}
 .dk.portrait .dk-big{max-width:100%}
 .dk.portrait .dk-theme{max-width:100%}
@@ -3701,7 +3704,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-31 · 17';
+var APP_VERSION = '2026-10-31 · 19';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
