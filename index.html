@@ -424,6 +424,10 @@ label.f select{padding:7px 8px}
 .dk-qrtext .dk-title{font-size:calc(4.4 * var(--u));line-height:1.1}
 .dk-qrcap{margin:calc(1 * var(--u)) 0 0;font-weight:800;font-size:calc(2.6 * var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--dk-bone);line-height:1.25}
 .dk-qrcap::before{content:"\2190  ";font-size:1.1em}
+.dk.portrait .dk-qrslide{flex-direction:column;gap:calc(3 * var(--u));text-align:center}
+.dk.portrait .dk-qrslide .dk-qr{width:min(calc(40 * var(--u)),78%)}
+.dk.portrait .dk-qrtext{align-items:center;max-width:100%}
+.dk.portrait .dk-qrcap::before{content:"\2191  "}
 .dk-qr figcaption{font-weight:700;font-size:calc(1.45 * var(--u));letter-spacing:.12em;text-wrap:balance;max-width:100%;text-transform:uppercase;color:var(--dk-bone);text-align:center;line-height:1.3}
 .has-qr .dk-cue{right:calc(24 * var(--u))}
 .has-qr .dk-vnum{min-width:calc(7 * var(--u))}
@@ -3694,7 +3698,7 @@ async function takeSharedFile(){
    Automatic looks, in order: a file shared into the installed app (Android: WhatsApp → Share → Tata Ibadah),
    the watched folder (Chrome / Edge on a computer), then Google Drive (after connecting it once).
    A web app cannot open WhatsApp's own storage, so a WhatsApp file reaches us by sharing or by saving it to Drive. */
-var APP_VERSION = '2026-10-31 · 14';
+var APP_VERSION = '2026-10-31 · 15';
 var GDRIVE_CLIENT_ID = '';   // Google OAuth client ID (Web application); can also be pasted in the pop-up
 var IS_ANDROID = /Android/i.test(navigator.userAgent);
 var IS_STANDALONE = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;

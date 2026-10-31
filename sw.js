@@ -1,6 +1,6 @@
 // Offline support: always try the network first (bypassing stale browser caches), fall back to the cached copy when offline.
 // Also receives files shared to the installed app (Android: WhatsApp → Share → Tata Ibadah).
-const CACHE = "tata-ibadah-v21";
+const CACHE = "tata-ibadah-v22";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const CDN = ["cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
